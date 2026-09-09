@@ -33,6 +33,12 @@ use crate::{
     tags::{TagId, TagState, load_tag_states_from, save_tag_states_to},
 };
 
+actions!(kitter, [Quit]);
+
+fn quit(_: &Quit, cx: &mut App) {
+    cx.quit();
+}
+
 mod add_actions;
 mod add_flow;
 mod adoption_list;
@@ -1932,6 +1938,8 @@ pub fn run() {
     gpui_platform::application()
         .with_assets(crate::assets::Assets)
         .run(|cx: &mut App| {
+            cx.on_action(quit);
+            cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
             cx.set_app_identity("dev.kitter.app", "Kitter");
             gpui_component::init(cx);
             crate::assets::register_fonts(cx).expect("failed to register fonts");
