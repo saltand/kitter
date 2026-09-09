@@ -1,6 +1,7 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 fn main() {
+    let _ = fix_path_env::fix();
     #[cfg(target_os = "windows")]
     install_windows_panic_reporter();
     kitter::ui::run();
