@@ -260,12 +260,14 @@ mod tests {
     #[test]
     fn collapsed_skill_groups_round_trip_and_default_when_missing() {
         let mut config = AppConfig::default();
-        config
-            .collapsed_skill_groups
-            .insert("group-a".into());
+        config.collapsed_skill_groups.insert("group-a".into());
 
-        let restored: AppConfig = serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
-        assert_eq!(restored.collapsed_skill_groups, config.collapsed_skill_groups);
+        let restored: AppConfig =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert_eq!(
+            restored.collapsed_skill_groups,
+            config.collapsed_skill_groups
+        );
 
         let older = r#"{"language":"system","theme":"system","library_dir":"/tmp/skills"}"#;
         let restored: AppConfig = serde_json::from_str(older).unwrap();
