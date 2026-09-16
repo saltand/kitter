@@ -597,7 +597,7 @@ impl KitterApp {
                     div()
                         .flex_none()
                         .px(px(24.))
-                        .pt(px(24.))
+                        .pt(px(WINDOW_DRAG_HEIGHT))
                         .pb(px(18.))
                         .border_b_1()
                         .border_color(p.border)
@@ -651,7 +651,7 @@ impl KitterApp {
                 )
                 .child(tabs)
                 .child(skills)
-                .child(self.window_drag_strip("project-detail-window-drag", 24., cx))
+                .child(self.window_drag_strip("project-detail-window-drag", cx))
         } else {
             let first = self.model.library.config.recent_projects.is_empty();
             div()
@@ -710,7 +710,7 @@ impl KitterApp {
                         cx.listener(|this, _, window, cx| this.browse_project(window, cx)),
                     ),
                 )
-                .child(self.window_drag_strip("empty-project-detail-window-drag", 24., cx))
+                .child(self.window_drag_strip("empty-project-detail-window-drag", cx))
         };
         layout::content(
             &self.shell.content_layout,

@@ -10,6 +10,7 @@ pub(super) const CONTROL_HEIGHT: f32 = 28.;
 pub(super) const DIALOG_CONTROL_HEIGHT: f32 = 32.;
 pub(super) const INPUT_HEIGHT: f32 = 40.;
 pub(super) const SEARCH_HEIGHT: f32 = 32.;
+pub(super) const WINDOW_DRAG_HEIGHT: f32 = 52.;
 pub(super) const RADIUS_CONTROL: f32 = 12.5;
 pub(super) const RADIUS_LIST_ROW: f32 = 10.;
 pub(super) const RADIUS_INLINE_INPUT: f32 = 10.;

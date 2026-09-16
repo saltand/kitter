@@ -207,7 +207,9 @@ impl KitterApp {
             .relative()
             .flex_1()
             .h_full()
-            .p(px(20.))
+            .px(px(20.))
+            .pt(px(WINDOW_DRAG_HEIGHT))
+            .pb(px(20.))
             .flex()
             .justify_center()
             .child(
@@ -242,6 +244,6 @@ impl KitterApp {
                     )
                     .child(library_group),
             )
-            .child(self.window_drag_strip("settings-window-drag", 20., cx))
+            .child(self.window_drag_strip("settings-window-drag", cx))
     }
 }

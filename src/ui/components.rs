@@ -695,7 +695,6 @@ impl KitterApp {
     pub(super) fn window_drag_strip(
         &self,
         id: &'static str,
-        height: f32,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         self.window_drag_region(
@@ -705,7 +704,7 @@ impl KitterApp {
                 .top(px(0.))
                 .left(px(0.))
                 .right(px(0.))
-                .h(px(height)),
+                .h(px(WINDOW_DRAG_HEIGHT)),
             cx,
         )
     }
@@ -757,7 +756,7 @@ impl KitterApp {
                     div()
                         .id("sidebar-window-drag")
                         .w_full()
-                        .h(px(46.))
+                        .h(px(WINDOW_DRAG_HEIGHT))
                         .flex_none(),
                     cx,
                 ),
@@ -834,7 +833,7 @@ impl KitterApp {
     ) -> Div {
         let p = self.palette();
         let header = div()
-            .h(px(52.))
+            .h(px(WINDOW_DRAG_HEIGHT))
             .flex_none()
             .px(px(12.))
             .flex()

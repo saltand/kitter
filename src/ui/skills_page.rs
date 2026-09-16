@@ -1519,7 +1519,7 @@ impl KitterApp {
             .flex()
             .flex_col()
             .px(px(24.))
-            .pt(px(28.))
+            .pt(px(WINDOW_DRAG_HEIGHT))
             .child(
                 div()
                     .flex()
@@ -1580,7 +1580,7 @@ impl KitterApp {
                     ),
             )
             .child(names)
-            .child(self.window_drag_strip("multi-skill-detail-window-drag", 24., cx))
+            .child(self.window_drag_strip("multi-skill-detail-window-drag", cx))
     }
 
     pub(super) fn skill_detail(&self, window: &mut Window, cx: &mut Context<Self>) -> Div {
@@ -1600,7 +1600,7 @@ impl KitterApp {
                     "添加第一个技能开始使用 Kitter",
                     "Add your first skill to get started",
                 ))
-                .child(self.window_drag_strip("empty-skill-detail-window-drag", 24., cx));
+                .child(self.window_drag_strip("empty-skill-detail-window-drag", cx));
         };
         let storage_name = skill_storage_name(skill).to_string();
         let skill_path = skill.path.clone();
@@ -1783,7 +1783,7 @@ impl KitterApp {
         }
         let header = div()
             .px(px(24.))
-            .pt(px(24.))
+            .pt(px(WINDOW_DRAG_HEIGHT))
             .pb(px(16.))
             .child(
                 div()
@@ -1875,7 +1875,7 @@ impl KitterApp {
             } else {
                 self.content_tab(skill, window, cx)
             })
-            .child(self.window_drag_strip("skill-detail-window-drag", 24., cx))
+            .child(self.window_drag_strip("skill-detail-window-drag", cx))
     }
 
     pub(super) fn tab_button(
