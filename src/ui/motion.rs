@@ -5,8 +5,9 @@ use std::{
 };
 
 use gpui::{
-    AnyElement, App, EntityId, Global, IntoElement, RenderOnce, Svg, Transformation, Window,
-    percentage,
+    Animation, AnimationExt, AnyElement, App, Div, ElementId, EntityId, Global, IntoElement,
+    RenderOnce, Styled, Svg, Transformation, Window, ease_in_out, percentage,
+    prelude::FluentBuilder, relative,
 };
 
 // GPUI currently refreshes the window for each animation frame. A 30 fps loader
@@ -98,18 +99,23 @@ pub fn spin(icon: Svg) -> AnyElement {
     Spinner { icon }.into_any_element()
 }
 
-/// Reuses the loader clock and honors the platform's reduced-motion preference.
-pub fn progress_phase(window: &Window, cx: &mut App) -> f32 {
+/// Vsync-aligned indeterminate fill. Decorative loaders should use this instead
+/// of driving `left` from the shared 30 fps clock.
+pub fn indeterminate_indicator(id: impl Into<ElementId>, fill: Div, cx: &App) -> AnyElement {
     if cx.reduce_motion() {
-        return 0.5;
+        return fill
+            .left(relative(0.325))
+            .right(relative(0.325))
+            .into_any_element();
     }
-    let phase = (cx
-        .default_global::<AnimationClock>()
-        .epoch
-        .elapsed()
-        .as_secs_f32()
-        / 1.4)
-        .fract();
-    lease(window.current_view(), cx);
-    phase
+    fill.with_animation(
+        id,
+        Animation::new(Duration::from_secs(1)).repeat(),
+        |this, delta| {
+            let start = relative(ease_in_out(((delta - 0.5) / 0.5).clamp(0., 1.)));
+            let end = relative(ease_in_out(1.0 - delta));
+            this.when(delta > 0.5, |this| this.left(start)).right(end)
+        },
+    )
+    .into_any_element()
 }

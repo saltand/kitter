@@ -1,20 +1,24 @@
 use super::*;
 
 impl KitterApp {
-    fn scan_progress(&self, window: &mut Window, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn scan_progress(&self, cx: &mut Context<Self>) -> Stateful<Div> {
         let p = self.palette();
         let label = if matches!(self.add_flow.kind, AddKind::Npx | AddKind::Claude) {
             self.tr("正在获取技能…", "Fetching skills…")
         } else {
             self.tr("正在扫描技能…", "Scanning skills…")
         };
-        let fill = div()
-            .absolute()
-            .h_full()
-            .rounded(px(2.))
-            .bg(p.secondary)
-            .left(relative(motion::progress_phase(window, cx) * 1.3 - 0.3))
-            .w(relative(0.3));
+        let fill = motion::indeterminate_indicator(
+            "scan-progress-fill",
+            div()
+                .absolute()
+                .top_0()
+                .left_0()
+                .h_full()
+                .rounded(px(2.))
+                .bg(p.secondary),
+            cx,
+        );
         div()
             .id("scan-progress")
             .debug_selector(|| "scan-progress".into())
@@ -595,7 +599,7 @@ impl KitterApp {
                             }),
                     )
                     .child(form)
-                    .when(self.add_flow.task == Some(AddTask::Scanning), |panel| panel.child(self.scan_progress(window, cx))),
+                    .when(self.add_flow.task == Some(AddTask::Scanning), |panel| panel.child(self.scan_progress(cx))),
             )
             .child(
                 div()
