@@ -1512,27 +1512,7 @@ mod e2e_tests {
     use std::fs;
 
     fn init(cx: &mut TestAppContext) {
-        cx.update(|cx| {
-            gpui_component::init(cx);
-            super::init_actions(cx);
-        });
-    }
-
-    #[test]
-    fn quit_is_bound_to_the_platform_shortcut() {
-        let mut cx = TestAppContext::single();
-        init(&mut cx);
-        cx.update(|cx| {
-            assert!(cx.is_action_available(&super::Quit));
-            let expected = gpui::KeyBinding::new("secondary-q", super::Quit, None);
-            let keymap = cx.key_bindings();
-            assert!(
-                keymap
-                    .borrow()
-                    .bindings_for_action(&super::Quit)
-                    .any(|binding| binding.keystrokes() == expected.keystrokes())
-            );
-        });
+        cx.update(gpui_component::init);
     }
 
     #[test]
@@ -2109,14 +2089,6 @@ fn minimum_window_size(cx: &App) -> Size<Pixels> {
     fit_minimum_window_size(cx.primary_display().map(|display| display.bounds().size))
 }
 
-actions!(kitter, [Quit]);
-
-fn init_actions(cx: &mut App) {
-    cx.bind_keys([KeyBinding::new("secondary-q", Quit, None)]);
-    cx.on_action(|_: &Quit, cx: &mut App| cx.quit());
-    cx.set_menus([Menu::new("Kitter").items([MenuItem::action("Quit", Quit)])]);
-}
-
 pub fn run() {
     gpui_platform::application()
         .with_assets(crate::assets::Assets)
@@ -2126,14 +2098,6 @@ pub fn run() {
             cx.set_app_identity("dev.kitter.app", "Kitter");
             gpui_component::init(cx);
             crate::assets::register_fonts(cx).expect("failed to register fonts");
-            init_actions(cx);
-            cx.on_window_closed(|cx, _| {
-                if cx.windows().is_empty() {
-                    cx.quit();
-                }
-            })
-            .detach();
-            cx.activate(true);
             cx.open_window(
                 WindowOptions {
                     titlebar: Some(TitlebarOptions {
