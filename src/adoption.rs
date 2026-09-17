@@ -73,6 +73,7 @@ impl AdoptionCandidate {
             update_available: false,
             group_id: None,
             last_operated_at: 0,
+            kitter_manual: false,
         }
     }
     pub fn verify(&self) -> Result<()> {

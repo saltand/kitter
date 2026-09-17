@@ -574,6 +574,16 @@ pub fn is_manual_skill(skill_dir: &Path) -> bool {
     frontmatter_visibility(&metadata) == SkillVisibility::ManualOnly || codex_manual_only(skill_dir)
 }
 
+pub fn has_disable_model_invocation(skill_dir: &Path) -> bool {
+    fs::read_to_string(skill_dir.join("SKILL.md"))
+        .ok()
+        .is_some_and(|content| content_disables_model_invocation(&content))
+}
+
+pub fn content_disables_model_invocation(content: &str) -> bool {
+    parse_visibility(content) == SkillVisibility::ManualOnly
+}
+
 fn discover(
     policy: &dyn AgentSkillPolicy,
     context: &DiscoveryContext,
@@ -3185,6 +3195,18 @@ mod tests {
         )
         .unwrap();
         assert!(is_manual_skill(&skill));
+        assert!(!has_disable_model_invocation(&skill));
+    }
+
+    #[test]
+    fn frontmatter_flag_is_detected_independently_of_codex_policy() {
+        let temp = tempdir().unwrap();
+        write_skill(temp.path(), "manual", "disable-model-invocation: true\n");
+        assert!(has_disable_model_invocation(&temp.path().join("manual")));
+        write_skill(temp.path(), "automatic", "");
+        assert!(!has_disable_model_invocation(
+            &temp.path().join("automatic")
+        ));
     }
 
     #[test]

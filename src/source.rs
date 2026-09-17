@@ -184,6 +184,7 @@ impl SkillScan {
                     update_available: false,
                     group_id: group_id.clone(),
                     last_operated_at: 0,
+                    kitter_manual: false,
                 },
             )?;
             added_skills.push(name);
