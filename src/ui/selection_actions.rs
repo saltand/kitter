@@ -110,4 +110,30 @@ impl KitterApp {
         self.set_detail_selection(primary);
         cx.notify();
     }
+
+    pub(super) fn set_skill_kitter_manual(
+        &mut self,
+        storage_name: String,
+        enabled: bool,
+        cx: &mut Context<Self>,
+    ) {
+        match self
+            .model
+            .library
+            .set_kitter_manual_by_storage(&storage_name, enabled)
+        {
+            Ok(()) => {
+                self.refresh(cx);
+                self.show_notice(
+                    if enabled {
+                        self.tr("已设为仅手动触发", "Set as manual-only")
+                    } else {
+                        self.tr("已还原自动触发", "Restored automatic invocation")
+                    },
+                    cx,
+                );
+            }
+            Err(error) => self.show_notice(self.error_message(error), cx),
+        }
+    }
 }

@@ -156,6 +156,9 @@ pub struct SkillRecord {
     pub group_id: Option<String>,
     #[serde(default)]
     pub last_operated_at: u64,
+    /// Kitter forced `disable-model-invocation: true` and restores it after updates.
+    #[serde(default)]
+    pub kitter_manual: bool,
 }
 
 impl SkillRecord {

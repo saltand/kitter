@@ -116,6 +116,33 @@ impl KitterApp {
             .child(self.tr("手动", "Manual"))
     }
 
+    pub(super) fn kitter_manual_badge(&self) -> Div {
+        let p = self.palette();
+        div()
+            .h(px(20.))
+            .px(px(7.))
+            .rounded(px(7.5))
+            .bg(p.raised)
+            .flex()
+            .flex_none()
+            .items_center()
+            .gap(px(4.))
+            .text_size(px(11.))
+            .text_color(p.accent)
+            .child(Self::icon("icons/hand.svg", 11., p.accent))
+            .child(self.tr("已设为手动", "Set as manual"))
+    }
+
+    pub(super) fn skill_manual_badge(&self, skill: &SkillSummary) -> Option<Div> {
+        if skill.record.kitter_manual {
+            Some(self.kitter_manual_badge())
+        } else if skill.manual_only {
+            Some(self.manual_skill_badge())
+        } else {
+            None
+        }
+    }
+
     pub(super) fn managed_skill_badge(&self) -> Div {
         let p = self.palette();
         div()
