@@ -16,6 +16,7 @@ desktop = [
     "dep:gpui-component",
     "dep:gpui-base",
     "dep:gpui-component-assets",
+    "dep:fix-path-env",
 ]
 ui-test = ["desktop", "gpui/test-support"]
 
@@ -35,6 +36,7 @@ sys-locale = "0.3.2"
 tempfile = "3.20"
 walkdir = "2.5"
 ignore = "0.4"
+fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 junction = "2.0"
