@@ -738,6 +738,12 @@ impl KitterApp {
         )
         .detach();
         let (tags, project_tags) = load_tag_states_from(&data_dir);
+        let collapsed_groups = library
+            .config
+            .collapsed_skill_groups
+            .iter()
+            .cloned()
+            .collect();
         Self {
             model: AppModel {
                 library,
@@ -768,7 +774,7 @@ impl KitterApp {
                 content_snapshot: RefCell::new(None),
                 content_scroll: ScrollHandle::new(),
                 selectable_text_handles: RefCell::new(BTreeMap::new()),
-                collapsed_groups: HashSet::new(),
+                collapsed_groups,
                 collapsed_content_directories: HashSet::new(),
             },
             projects_view: ProjectsState {
@@ -924,6 +930,16 @@ impl KitterApp {
             &self.tags_flow.skills,
             &self.tags_flow.projects,
         );
+    }
+
+    fn persist_collapsed_groups(&mut self) {
+        self.model.library.config.collapsed_skill_groups =
+            self.skills_view.collapsed_groups.iter().cloned().collect();
+        let _ = self
+            .model
+            .library
+            .config
+            .save_to(self.model.library.data_dir());
     }
 
     fn tag_filter_for(&self, scope: TagScope) -> Option<TagId> {
@@ -1486,6 +1502,41 @@ mod e2e_tests {
         });
         assert!(data_dir.join("registry.json").is_file());
         assert!(data_dir.join("skills/_kitter-builtin/SKILL.md").is_file());
+    }
+
+    #[test]
+    fn collapsed_skill_groups_are_restored_from_config() {
+        let mut cx = TestAppContext::single();
+        init(&mut cx);
+        let temp = tempfile::tempdir().unwrap();
+        let data_dir = temp.path().join("kitter-data");
+        let (app, cx) = cx.add_window_view({
+            let data_dir = data_dir.clone();
+            move |window, cx| KitterApp::new_in(data_dir, window, cx)
+        });
+        let group_id = app.update(cx, |app, _| {
+            let id = app.model.library.create_group("owner/repository").unwrap().id;
+            app.skills_view.collapsed_groups.insert(id.clone());
+            app.persist_collapsed_groups();
+            id
+        });
+
+        let mut cx = TestAppContext::single();
+        init(&mut cx);
+        let (app, cx) = cx.add_window_view({
+            let data_dir = data_dir.clone();
+            move |window, cx| KitterApp::new_in(data_dir, window, cx)
+        });
+        cx.read_entity(&app, |app, _| {
+            assert!(app.skills_view.collapsed_groups.contains(&group_id));
+            assert!(
+                app.model
+                    .library
+                    .config
+                    .collapsed_skill_groups
+                    .contains(&group_id)
+            );
+        });
     }
 
     #[test]
