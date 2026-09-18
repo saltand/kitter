@@ -79,6 +79,14 @@ const MESSAGES: &[(&str, &str)] = &[
         "This built-in skill stays at the top of the list",
     ),
     (
+        "这个技能本身就是仅手动触发",
+        "This skill is already manual-only",
+    ),
+    (
+        "这个技能不是由 Kitter 设为仅手动触发",
+        "This skill was not set as manual by Kitter",
+    ),
+    (
         "这个技能没有可用的更新来源",
         "No update source is available for this skill",
     ),

@@ -76,6 +76,22 @@ impl KitterApp {
         } else {
             self.tr("删除技能", "Delete Skill").to_string()
         };
+        let set_manual_label = self.tr("设为仅手动", "Set as manual-only").to_string();
+        let restore_manual_label = self.tr("还原自动触发", "Restore automatic").to_string();
+        let kitter_manual_enabled = if skill.record.origin.is_builtin() {
+            None
+        } else if skill.record.kitter_manual {
+            Some(false)
+        } else if skill.manual_only {
+            None
+        } else {
+            Some(true)
+        };
+        let kitter_manual_label = match kitter_manual_enabled {
+            Some(true) => set_manual_label,
+            Some(false) => restore_manual_label,
+            None => String::new(),
+        };
         let move_group_label = if multi_selection {
             if self.uses_english() {
                 format!("Move {selection_count} skills to group")
@@ -88,6 +104,7 @@ impl KitterApp {
         let delete_menu_color = p.danger;
         let selection_mode = self.skills_view.selection.is_multiple();
         let context_name = storage_name.clone();
+        let kitter_storage_name = storage_name.clone();
         let click_name = storage_name.clone();
         let click_order = visible_order;
         let reveal_path = skill.path.clone();
@@ -179,8 +196,8 @@ impl KitterApp {
                         ),
                     ),
             )
-            .when(skill.manual_only, |row| {
-                row.child(self.manual_skill_badge())
+            .when_some(self.skill_manual_badge(skill), |row, badge| {
+                row.child(badge)
             })
             .when(!built_in, |row| {
                 row.on_drag(
@@ -225,6 +242,23 @@ impl KitterApp {
                             .icon(Icon::new(IconName::FolderOpen))
                             .on_click(move |_, _, cx| cx.reveal_path(&reveal_path)),
                     );
+                    if let Some(enabled) = kitter_manual_enabled {
+                        let kitter_app = context_app.clone();
+                        let kitter_name = kitter_storage_name.clone();
+                        menu = menu.item(
+                            PopupMenuItem::new(kitter_manual_label.clone())
+                                .icon(Icon::default().path("icons/hand.svg"))
+                                .on_click(move |_, _, cx| {
+                                    let _ = kitter_app.update(cx, |this, cx| {
+                                        this.set_skill_kitter_manual(
+                                            kitter_name.clone(),
+                                            enabled,
+                                            cx,
+                                        );
+                                    });
+                                }),
+                        );
+                    }
                 }
                 menu = menu.item(
                     PopupMenuItem::new(set_tags_label.clone())
@@ -1818,8 +1852,8 @@ impl KitterApp {
                                         window,
                                         cx,
                                     ))
-                                    .when(skill.manual_only, |title| {
-                                        title.child(self.manual_skill_badge())
+                                    .when_some(self.skill_manual_badge(skill), |title, badge| {
+                                        title.child(badge)
                                     }),
                             )
                             .child(
@@ -2365,6 +2399,7 @@ mod tests {
                 update_available: false,
                 group_id: group_id.map(str::to_string),
                 last_operated_at: 0,
+                kitter_manual: false,
             },
             path: PathBuf::new(),
             installed_projects: 0,

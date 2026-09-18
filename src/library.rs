@@ -80,6 +80,7 @@ impl SkillLibrary {
                     update_available: false,
                     group_id: None,
                     last_operated_at: u64::MAX,
+                    kitter_manual: false,
                 }
             });
         if builtin.name != KITTER_SKILL_NAME
@@ -220,6 +221,7 @@ impl SkillLibrary {
                     update_available: false,
                     group_id: None,
                     last_operated_at: 0,
+                    kitter_manual: false,
                 });
             if record.storage_name.is_empty() {
                 record.storage_name = storage_name.clone();
@@ -451,6 +453,7 @@ impl SkillLibrary {
             let mut record = candidate.record();
             record.storage_name = storage.clone();
             record.group_id = existing.as_ref().and_then(|r| r.group_id.clone());
+            record.kitter_manual = existing.as_ref().is_some_and(|r| r.kitter_manual);
             record.last_operated_at = operation_stamp();
             let source = record.origin.source();
             let source_record = self
@@ -578,6 +581,13 @@ impl SkillLibrary {
                 fs::remove_dir_all(backup)?;
                 record.storage_name = storage_name.clone();
                 record.last_operated_at = operation_stamp();
+                if record.kitter_manual {
+                    if crate::effective_skills::has_disable_model_invocation(&destination) {
+                        record.kitter_manual = false;
+                    } else {
+                        apply_disable_model_invocation(&destination.join("SKILL.md"), true)?;
+                    }
+                }
                 self.registry.skills.insert(storage_name, record);
                 for project in affected_projects {
                     self.config.touch_project(&project);
@@ -882,6 +892,42 @@ impl SkillLibrary {
         self.save()
     }
 
+    pub fn set_kitter_manual_by_storage(
+        &mut self,
+        storage_name: &str,
+        enabled: bool,
+    ) -> Result<()> {
+        validate_name(storage_name)?;
+        let path = self.skill_path_by_storage(storage_name)?;
+        let (is_builtin, already_kitter) = {
+            let record = self
+                .registry
+                .skills
+                .get(storage_name)
+                .context("技能不存在")?;
+            (record.origin.is_builtin(), record.kitter_manual)
+        };
+        if is_builtin {
+            bail!("这个技能本身就是仅手动触发");
+        }
+        if enabled {
+            if !already_kitter && crate::effective_skills::has_disable_model_invocation(&path) {
+                bail!("这个技能本身就是仅手动触发");
+            }
+        } else if !already_kitter {
+            bail!("这个技能不是由 Kitter 设为仅手动触发");
+        }
+        apply_disable_model_invocation(&path.join("SKILL.md"), enabled)?;
+        let record = self
+            .registry
+            .skills
+            .get_mut(storage_name)
+            .context("技能不存在")?;
+        record.kitter_manual = enabled;
+        record.last_operated_at = operation_stamp();
+        self.save()
+    }
+
     fn storage_name_for(&self, name: &str, identity: &str) -> String {
         let direct = self.config.library_dir.join(name);
         if !direct.exists() && !self.registry.skills.contains_key(name) {
@@ -990,6 +1036,117 @@ pub fn read_frontmatter(path: &Path) -> Result<(Option<String>, Option<String>)>
     Ok((None, None))
 }
 
+const DISABLE_MODEL_INVOCATION: &str = "disable-model-invocation";
+
+fn apply_disable_model_invocation(skill_md: &Path, enabled: bool) -> Result<()> {
+    let content = fs::read_to_string(skill_md)
+        .with_context(|| format!("读取技能文件失败：{}", skill_md.display()))?;
+    let updated = set_disable_model_invocation_markdown(&content, enabled);
+    if updated != content {
+        fs::write(skill_md, updated)
+            .with_context(|| format!("写入技能文件失败：{}", skill_md.display()))?;
+    }
+    Ok(())
+}
+
+fn set_disable_model_invocation_markdown(content: &str, enabled: bool) -> String {
+    if enabled && crate::effective_skills::content_disables_model_invocation(content) {
+        return content.to_string();
+    }
+    let Some((start, end)) = frontmatter_body_span(content) else {
+        if !enabled {
+            return content.to_string();
+        }
+        let newline = markdown_newline(content);
+        return format!(
+            "---{newline}{DISABLE_MODEL_INVOCATION}: true{newline}---{newline}{content}"
+        );
+    };
+    let body = &content[start..end];
+    let newline = if body.contains("\r\n") || content[..start].contains("\r\n") {
+        "\r\n"
+    } else {
+        markdown_newline(content)
+    };
+    let mut lines = body.lines().map(str::to_string).collect::<Vec<_>>();
+    if let Some(index) = lines
+        .iter()
+        .position(|line| yaml_line_key(line) == Some(DISABLE_MODEL_INVOCATION))
+    {
+        if enabled {
+            let indent: String = lines[index]
+                .chars()
+                .take_while(|character| *character == ' ' || *character == '\t')
+                .collect();
+            lines[index] = format!("{indent}{DISABLE_MODEL_INVOCATION}: true");
+        } else {
+            lines.remove(index);
+        }
+    } else if enabled {
+        let mut insert_at = lines.len();
+        while insert_at > 0 && lines[insert_at - 1].trim().is_empty() {
+            insert_at -= 1;
+        }
+        lines.insert(insert_at, format!("{DISABLE_MODEL_INVOCATION}: true"));
+    } else {
+        return content.to_string();
+    }
+    let new_body = lines.join(newline);
+    let closing = &content[end..];
+    let glue = if new_body.is_empty() || closing.starts_with('\n') || closing.starts_with("\r\n") {
+        ""
+    } else {
+        newline
+    };
+    format!("{}{new_body}{glue}{closing}", &content[..start])
+}
+
+fn frontmatter_body_span(content: &str) -> Option<(usize, usize)> {
+    let prefix_len = if content.starts_with("---\r\n") {
+        5
+    } else if content.starts_with("---\n") {
+        4
+    } else {
+        return None;
+    };
+    let rest = &content[prefix_len..];
+    let mut ends = Vec::new();
+    if rest.starts_with("---\n") || rest.starts_with("---\r\n") || rest == "---" {
+        ends.push(0);
+    }
+    if let Some(at) = rest.find("\n---\n") {
+        ends.push(at);
+    }
+    if let Some(at) = rest.find("\r\n---\r\n") {
+        ends.push(at);
+    }
+    if let Some(body) = rest.strip_suffix("\n---") {
+        ends.push(body.len());
+    }
+    if let Some(body) = rest.strip_suffix("\r\n---") {
+        ends.push(body.len());
+    }
+    let end = ends.into_iter().min()?;
+    Some((prefix_len, prefix_len + end))
+}
+
+fn yaml_line_key(line: &str) -> Option<&str> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return None;
+    }
+    let (key, _) = trimmed.split_once(':')?;
+    Some(key.trim().trim_matches(['"', '\'']))
+}
+
+fn markdown_newline(content: &str) -> &'static str {
+    if content.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    }
+}
+
 #[derive(Default, Deserialize)]
 struct Frontmatter {
     name: Option<String>,
@@ -1079,6 +1236,7 @@ mod tests {
                 update_available: false,
                 group_id: None,
                 last_operated_at: u64::MAX,
+                kitter_manual: false,
             },
         );
         let mut library = SkillLibrary {
@@ -1452,5 +1610,144 @@ mod tests {
 
         let reopened = SkillLibrary::open_in(data_dir).unwrap();
         assert_eq!(reopened.groups()[0].name, r"team\skills");
+    }
+
+    fn local_record(name: &str, path: &Path) -> SkillRecord {
+        SkillRecord {
+            name: name.into(),
+            storage_name: String::new(),
+            description: String::new(),
+            origin: SkillOrigin::Local {
+                path: path.to_path_buf(),
+                source_root: None,
+            },
+            update_available: false,
+            group_id: None,
+            last_operated_at: 0,
+            kitter_manual: false,
+        }
+    }
+
+    #[test]
+    fn kitter_manual_writes_frontmatter_and_survives_updates() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut library = SkillLibrary::open_in(temp.path().join("data")).unwrap();
+        let source = temp.path().join("source");
+        fixture_skill(&source, "demo");
+        library
+            .import(&source, local_record("demo", &source))
+            .unwrap();
+
+        library.set_kitter_manual_by_storage("demo", true).unwrap();
+        let skill_md = library
+            .skill_path_by_storage("demo")
+            .unwrap()
+            .join("SKILL.md");
+        let marked = fs::read_to_string(&skill_md).unwrap();
+        assert!(marked.contains("disable-model-invocation: true"));
+        assert!(marked.contains("name: demo"));
+        assert!(library.record_by_storage("demo").unwrap().kitter_manual);
+        assert!(library.list().unwrap().iter().any(|skill| {
+            skill.record.storage_name == "demo" && skill.manual_only && skill.record.kitter_manual
+        }));
+
+        let updated = temp.path().join("updated");
+        fixture_skill(&updated, "demo");
+        fs::write(
+            updated.join("SKILL.md"),
+            "---\nname: demo\ndescription: newer\n---\nupdated body\n",
+        )
+        .unwrap();
+        let record = library.record_by_storage("demo").unwrap();
+        library
+            .replace_by_storage(&updated, "demo".into(), record)
+            .unwrap();
+        let restored = fs::read_to_string(&skill_md).unwrap();
+        assert!(restored.contains("disable-model-invocation: true"));
+        assert!(restored.contains("description: newer"));
+        assert!(restored.contains("updated body"));
+        assert!(library.record_by_storage("demo").unwrap().kitter_manual);
+
+        library.set_kitter_manual_by_storage("demo", false).unwrap();
+        let cleared = fs::read_to_string(&skill_md).unwrap();
+        assert!(!cleared.contains("disable-model-invocation"));
+        assert!(cleared.contains("description: newer"));
+        assert!(!library.record_by_storage("demo").unwrap().kitter_manual);
+    }
+
+    #[test]
+    fn originally_manual_skills_cannot_be_toggled_by_kitter() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut library = SkillLibrary::open_in(temp.path().join("data")).unwrap();
+        let source = temp.path().join("source");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(
+            source.join("SKILL.md"),
+            "---\nname: orig\ndescription: test\ndisable-model-invocation: true\n---\n",
+        )
+        .unwrap();
+        library
+            .import(&source, local_record("orig", &source))
+            .unwrap();
+
+        let error = library
+            .set_kitter_manual_by_storage("orig", true)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("本身就是仅手动触发"));
+        assert!(!library.record_by_storage("orig").unwrap().kitter_manual);
+        assert!(library.set_kitter_manual_by_storage("orig", false).is_err());
+        assert!(
+            library
+                .set_kitter_manual_by_storage(KITTER_SKILL_STORAGE, true)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn kitter_manual_override_clears_when_update_is_already_manual() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut library = SkillLibrary::open_in(temp.path().join("data")).unwrap();
+        let source = temp.path().join("source");
+        fixture_skill(&source, "demo");
+        library
+            .import(&source, local_record("demo", &source))
+            .unwrap();
+        library.set_kitter_manual_by_storage("demo", true).unwrap();
+
+        let updated = temp.path().join("updated");
+        fs::create_dir_all(&updated).unwrap();
+        fs::write(
+            updated.join("SKILL.md"),
+            "---\nname: demo\ndescription: upstream manual\ndisable-model-invocation: true\n---\n",
+        )
+        .unwrap();
+        let record = library.record_by_storage("demo").unwrap();
+        library
+            .replace_by_storage(&updated, "demo".into(), record)
+            .unwrap();
+        assert!(!library.record_by_storage("demo").unwrap().kitter_manual);
+        assert!(crate::effective_skills::has_disable_model_invocation(
+            &library.skill_path_by_storage("demo").unwrap()
+        ));
+    }
+
+    #[test]
+    fn disable_model_invocation_preserves_nested_frontmatter() {
+        let original = "---\nname: demo\ndescription: |\n  First line\n  Second line\nmetadata:\n  opencode:\n    autoinvoke: false\n---\nBody\n";
+        let enabled = set_disable_model_invocation_markdown(original, true);
+        assert!(enabled.contains("disable-model-invocation: true"));
+        assert!(enabled.contains("  First line"));
+        assert!(enabled.contains("    autoinvoke: false"));
+        let disabled = set_disable_model_invocation_markdown(&enabled, false);
+        assert!(!disabled.contains("disable-model-invocation"));
+        assert!(disabled.contains("  First line"));
+        assert_eq!(
+            set_disable_model_invocation_markdown(
+                "---\nname: demo\ndisable-model-invocation: false\n---\n",
+                true
+            ),
+            "---\nname: demo\ndisable-model-invocation: true\n---\n"
+        );
     }
 }
