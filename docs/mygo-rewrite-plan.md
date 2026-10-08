@@ -214,3 +214,59 @@ M1 之后 M2/M3/M4 的核心与 UI 可以交替推进；`effective`（M4）体�
 - `ignore` crate 在 `effective/scanner` 里用到的具体规则（是否读全局 gitignore、是否跳过隐藏文件），Go 端按需最小实现。
 - MyGo `List.Reorder` 能否满足「跨分组拖动技能」，不行就用通用 drag-and-drop 自己实现落点计算。
 - 自绘软阴影是否保留；MyGo 默认窗口阴影够用就不复刻。
+
+## 11. 实施记录（2025）
+
+移植按里程碑完成并逐个 commit 推送到 `feat/mygo-native-macos`：
+
+| 里程碑 | 内容 | 关键 commit |
+|---|---|---|
+| M0+M1 | 骨架 + 核心包（model/config/fslink/agents/tags/library/project） | `0defcd9` |
+| M1 评审修复 | — | `744d693` |
+| M2 | 技能页（分组列表、搜索、详情、删除） | `ea6ed3d`，竞态修复 `e463328` |
+| M3a | source + adoption 核心与导入 | `77da22f`、`b7db537` |
+| serde 修正 | `ReferenceKind` 字面值、严格枚举、SkillRecord 字段序 | `13bfb66` |
+| M3b | AddSkill 对话框 + pendingNotice 通知缝 | `539ec85` |
+| M4a | effective 核心（scanner、catalog、policies、估算） | `e15b372`、`63fa5cd`、`8c9a9fc` |
+| M4b | 项目页 + 安装流程 + 估算缓存 | `666b5c9`、`4fcba86`、`348992d` |
+| M4b 评审修复 | 每路径独立扫描任务（修掉批量任务顺序 bug） | `771afa0`、`6ea7ed8` |
+| M5 | 标签/分组管理对话框、设置页、更新检查 | `644d681` |
+| M5b | 拖拽 UI（tag/group/skill）+ 真实更新检查测试 | `cb9a9ce`、`0e334dc` |
+| M6 | `cmd/kitter` 全子命令 + golden 测试 | `8548050` |
+
+### 实际偏离方案的地方
+
+- **`skillfile` 包**：计划中把 SKILL.md 解析放在 `model` 内，实际拆成独立包 `core/skillfile`（解析 + 校验 + 名字合法性），model 只做数据结构。
+- **`SkillReference` 放进 model**：原计划属 adoption；因为 library 要持久化 references，为避免循环依赖放到了 `core/model`（ReferenceKind 字面值 `"Link"/"Direct"/"Alias"/"Plugin"`，不是 snake_case）。
+- **`post` 队列**：gpui 的 `cx.App` 任意线程投递 → `App.Apply` + 可注入的 `post` 函数；后台 goroutine 只允许纯读，库变更全部回 UI 线程执行。
+- **`pendingNotice`**：toast 不能由 goroutine 直接发（mygo vet 禁止捕获 `*ui.Context`），改为 `App.pendingNotice` 由 `View` 消费。
+- **per-path 扫描**：`requestProjectSnapshots` 一开始把多个 pending 路径合进一个 goroutine，造成 p1 慢扫描阻塞 p2——Rust 的 `project_snapshot_tasks` 本来就是每路径一个任务，评审时改回并为此写了真正的并发测试。
+- **拖拽实现**：mygo 一个元素只能接受一种 drag 类型（`s.accepts` 单值），group 头部要同时收 group 与 skill 拖入，解法是用包装 `Column` 承载 group drop、内层行承载 skill drop（命中沿祖先链走）。落点计算抽成纯函数（`dropHalf`/`tagDropAllowed`/`groupDropAllowed`）+ 表驱动测试；端到端用 `ui.NewTester` 的 `Press/Move/Release`。
+- **`-race` 纳入验收**：每次 push 前跑 `go test -race -count=3`，比方案要求更严。
+- **CLI 参数解析**：按计划用标准库手写分发（位置 dispatch + 容忍「选项在位置参数之后」的 scanner + `--` 终止 + `--flag=value`），没有引入第三方库；clap 语义够薄，不值得依赖。
+- **`env::current_exe`**：Rust 只在 npx fixture 测试里重执行自身，Go 版保留 in-process fake `source.Runner`（cmd/kitter 没有 fixture 子命令，重执行不增加覆盖）。
+- **effective 类型加 MarshalJSON**：`AgentKind`/`SkillScope`/`SkillSource`/`EffectiveSkill`/`AgentContextEstimate` 为 `project --json` 补了 serde 形态（snake_case 变体、内部 tag、Option→null）；这些是 M6 新增，不属于持久化文件。
+- **测试中的 env**：禁用 `os.Setenv("HOME")`；所有 env 读取走注入缝（`effective.envOr` + `envOverride`、`source.HomeDir`），`t.Setenv` 只用于 `KITTER_HOME`。
+
+### 已知与 Rust 的差异
+
+- mygo 的拖拽没有 gpui 的 hover 手柄和浮动预览实体；整行可拖、跟随指针的副本作为预览，交互等价但观感不同。
+- `drop_target` 高亮用行上/下边缘的 accent 边框（Rust 是绝对定位的 2px 线）。
+- `project` 项目选择器是普通的项目路径列表（Rust 是 gpui `Select` 下拉），选项相同。
+- `List.Reorder` 没有用上——mygo 提供通用 Drag/Drop/DragOver，自建了落点计算，能覆盖 tag 同级排序、group 排序、skill→group 三类。
+- `.app` 的 `CFBundleIconFile` 是 `AppIcon.icns`（Rust 打包是 `logo.icns`），并多出 `NSPrincipalClass`、`NSSupportsAutomaticGraphicsSwitching` 两个合理默认键；bundle id `dev.kitter.app`、最低系统 12.0 与 `resources/Info.plist` 一致。
+- CLI 的 `install`/`uninstall` 等帮助文本为手工对齐 clap 的排版，逐字相同不保证（选项顺序与措辞一致）。
+
+### 打包在 Linux 上的结果
+
+`cd native && go tool mygo build -platform darwin/arm64 -skip-dmg -skip-notarize -sign -` 产出 `build/darwin-arm64/Kitter.app`（14.1 MB）：`Contents/MacOS/Kitter`（darwin/arm64 可执行）、`Contents/Resources/AppIcon.icns` + `icon.png`、`Info.plist`、`PkgInfo`。必须在 Mac 上完成：代码签名（Developer ID 或 ad-hoc `codesign`）、`.dmg` 制作（`-skip-dmg` 关闭）、公证（`-skip-notarize`）、`just package` 的 DMG 背景图。
+
+### 需要在 Mac 上验收的清单
+
+- 视觉：主题（System/Light/Dark）切换、强调色、毛玻璃侧栏、圆角与阴影、深色模式下的边框/分隔线。
+- 中文：界面中文文案、中文字体渲染与输入法（TextInput 里的中文输入/候选框位置）。
+- 拖拽手感：tag 同级排序、group 排序（管理对话框与技能页列表）、skill 拖到 group 头部；before/after 高亮是否清晰。
+- 打包：`just go-app` 产出的 .app 能双击运行；`codesign --verify`；公证后的 dmg。
+- Finder/Spotlight 启动时的 PATH：`source.FindTool` 的 fallback（Homebrew、`~/.local/bin`、nvm 版本目录）在 GUI 启动（无 shell PATH）下能找到 `npx`/`git`/`claude`。
+- CLI：`go-cli` 产出的 `kitter` 与 `kitter --help`，`list --json` 与 Rust 版输出逐字段对比；`references/install-cli.md` 里的安装路径（`~/.local/bin/kitter`）。
+- 性能：长技能列表滚动流畅度、冷启动时间与内存（与 GPUI 版对比）。
