@@ -440,6 +440,18 @@ func filesIn(root string) ([]string, error) {
 	return files, nil
 }
 
+// FilesInDir is filesIn as a package-level helper: it lists the files
+// under a skill directory without opening the library, for use on
+// background goroutines where SkillLibrary's registry writes are off
+// limits.
+func FilesInDir(root string) ([]string, error) { return filesIn(root) }
+
+// ReadFileInDir is readFileIn without a SkillLibrary: it resolves the
+// symlinked root, keeps the result inside it, and reads UTF-8 text.
+func ReadFileInDir(root, relative string) (string, error) {
+	return readFileInDir(root, relative)
+}
+
 // ReadFile is SkillLibrary::read_file.
 func (l *SkillLibrary) ReadFile(name, relative string) (string, error) {
 	root, err := l.SkillPath(name)
@@ -467,6 +479,10 @@ func (l *SkillLibrary) ReadFileByStorage(storageName, relative string) (string, 
 }
 
 func (l *SkillLibrary) readFileIn(root, relative string) (string, error) {
+	return readFileInDir(root, relative)
+}
+
+func readFileInDir(root, relative string) (string, error) {
 	path, err := filepath.EvalSymlinks(filepath.Join(root, relative))
 	if err != nil {
 		return "", errors.New("该文件不是可预览的文本文件")

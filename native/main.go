@@ -38,13 +38,9 @@ func main() {
 		applyTheme(app)
 		app.SetDark(mygo.Theme.IsDark())
 		mygo.Theme.OnUpdated(func() {
-			if app.ShellWin != nil {
-				app.ShellWin.Update(func() { app.SetDark(mygo.Theme.IsDark()) })
-			} else {
-				app.SetDark(mygo.Theme.IsDark())
-			}
+			app.Apply(func() { app.SetDark(mygo.Theme.IsDark()) })
 		})
-		app.ShellWin = mygo.NewWindow(mygo.WindowOptions{
+		app.InitPost(mygo.NewWindow(mygo.WindowOptions{
 			Title:         "Kitter",
 			Width:         1200,
 			Height:        720,
@@ -54,7 +50,7 @@ func main() {
 			TitleBarStyle: mygo.TitleBarHiddenInset,
 			Vibrancy:      mygo.VibrancySidebar,
 			Content:       ui.View(app.View),
-		})
+		}))
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)

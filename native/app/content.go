@@ -1,6 +1,9 @@
 // content.go ports KitterApp::content_snapshot plus the project
-// snapshots the Installs tab reads, both fetched in goroutines and
-// applied via App.apply (win.Update) with generation counters.
+// snapshots the Installs tab reads. Each spawns a goroutine doing only
+// pure reads (file list/read, project scan) — the library is never
+// reopened off the UI thread, so no registry writes or builtin sync
+// race with the main SkillLibrary — then applies the result through
+// App.apply (win.Update) guarded by a generation counter.
 package app
 
 import (
@@ -25,16 +28,17 @@ func (a *App) requestContentSnapshot(skill *model.SkillSummary) {
 	}
 	a.Skills.contentGen++
 	gen := a.Skills.contentGen
-	dataDir := a.Library.DataDir
+	// Resolve the directory on the UI thread; the goroutine does only
+	// read-only filesystem work so it cannot race the registry.
+	root, err := a.Library.SkillPathByStorage(storageName)
 	go func() {
-		lib, err := library.OpenIn(dataDir)
 		var files []string
 		var content string
 		if err == nil {
-			files, _ = lib.FilesByStorage(storageName)
-			content, err = lib.ReadFileByStorage(storageName, file)
+			files, _ = library.FilesInDir(root)
+			content, err = library.ReadFileInDir(root, file)
 		}
-		a.apply(func() {
+		a.Apply(func() {
 			if a.Skills.contentGen != gen {
 				return // stale: selection moved on
 			}
@@ -54,8 +58,6 @@ func (a *App) requestContentSnapshot(skill *model.SkillSummary) {
 // projectSnapshot returns the cached snapshot for root, scheduling a
 // fetch if missing (project_snapshot in mod.rs).
 func (a *App) projectSnapshot(c *ui.Context, root string) []model.ProjectSkill {
-	a.snapMu.Lock()
-	defer a.snapMu.Unlock()
 	if snap, ok := a.projectSnapshots[root]; ok {
 		return snap
 	}
@@ -67,9 +69,7 @@ func (a *App) projectSnapshot(c *ui.Context, root string) []model.ProjectSkill {
 	libraryDir := a.Library.Config.LibraryDir
 	go func() {
 		skills, _ := project.List(root, libraryDir)
-		a.apply(func() {
-			a.snapMu.Lock()
-			defer a.snapMu.Unlock()
+		a.Apply(func() {
 			delete(a.projectTasks, root)
 			if gen != a.projectsGen {
 				return

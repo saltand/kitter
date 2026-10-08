@@ -63,13 +63,20 @@ type App struct {
 	skillList       ui.ListState
 
 	// Projects-state slice (ui::ProjectsState): per-root skill snapshots.
-	// snapMu guards only the fields written by background goroutines
-	// through apply(); nothing else locks. In the real app apply already
-	// serializes onto the main thread, so the mutex is a no-op there.
-	snapMu           sync.Mutex
+	// Goroutines deliver their results through apply -> post, which queues
+	// onto the UI thread (win.Update in the real app, the drained test
+	// queue in tests), so these maps are read and written on the UI
+	// thread only and need no lock.
 	projectsGen      uint64
 	projectSnapshots map[string][]model.ProjectSkill
 	projectTasks     map[string]bool
+
+	// post queues fn to run on the UI thread, as Window.Update does in
+	// the real app. Tests install a synchronous queue they drain.
+	postMu   sync.Mutex // guards only the queue itself
+	post     func(func())
+	queue    []func()
+	inflight int // apply calls queued or running, for waitIdle
 }
 
 // SkillsState is SkillsState in ui/state.rs plus the model list.
@@ -182,14 +189,64 @@ func (a *App) skillOrder() []string {
 	return order
 }
 
-// apply runs fn on the UI thread: through the window's Update in the real
-// app, inline in tests where ShellWin is nil.
-func (a *App) apply(fn func()) {
-	if a.ShellWin != nil {
-		a.ShellWin.Update(fn)
-	} else {
-		fn()
+// Apply runs fn on the UI thread through post. The real app posts to
+// mygo's main-thread queue via Window.Update; tests drain the queue
+// from the test goroutine with waitIdle.
+func (a *App) Apply(fn func()) {
+	a.postMu.Lock()
+	post := a.post
+	a.inflight++
+	if post == nil {
+		a.queue = append(a.queue, fn)
 	}
+	a.postMu.Unlock()
+	if post != nil {
+		post(fn)
+	}
+}
+
+// runApply invokes fn and marks its apply slot done.
+func (a *App) runApply(fn func()) {
+	fn()
+	a.postMu.Lock()
+	a.inflight--
+	a.postMu.Unlock()
+}
+
+// InitPost installs the production post implementation (win.Update).
+// Called once the window exists.
+func (a *App) InitPost(win *mygo.Window) {
+	a.ShellWin = win
+	a.postMu.Lock()
+	a.post = func(fn func()) { win.Update(fn) }
+	queued := a.queue
+	a.queue = nil
+	a.postMu.Unlock()
+	for _, fn := range queued {
+		win.Update(func() { a.runApply(fn) })
+	}
+}
+
+// drainApplies runs every queued apply closure, returning how many ran.
+// Tests call it until it returns 0, matching win.Update draining the
+// main-thread queue before the next frame.
+func (a *App) drainApplies() int {
+	a.postMu.Lock()
+	queued := a.queue
+	a.queue = nil
+	a.postMu.Unlock()
+	for _, fn := range queued {
+		a.runApply(fn)
+	}
+	return len(queued)
+}
+
+// idle reports whether every apply closure has run to completion: none
+// queued and none running. Tests wait on it in waitIdle.
+func (a *App) idle() bool {
+	a.postMu.Lock()
+	defer a.postMu.Unlock()
+	return a.inflight == 0
 }
 
 // homeDir mirrors dirs::home_dir ("" when unknown).

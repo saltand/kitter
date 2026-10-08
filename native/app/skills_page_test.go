@@ -262,8 +262,9 @@ func TestContentTabShowsSelectedFile(t *testing.T) {
 	if err := tt.Click(app.T("内容", "Content")); err != nil {
 		t.Fatalf("content tab: %v", err)
 	}
-	// Async snapshot applied via apply() (inline without a window).
-	waitFor(t, func() bool { return app.Skills.contentSnapshot })
+	// Async snapshot is queued via apply(); waitIdle drains the queue
+	// like win.Update drains the main-thread queue, then a frame shows it.
+	waitIdle(t, app)
 	tt.Frame()
 	if !tt.HasText("SKILL.md") {
 		t.Fatalf("file tree missing SKILL.md: %q", tt.Texts())
@@ -277,9 +278,10 @@ func TestContentTabShowsSelectedFile(t *testing.T) {
 		target = "references/guide.md"
 	}
 	if err := tt.Click(target); err == nil {
-		waitFor(t, func() bool {
-			return app.Skills.ContentFile == "references/guide.md" && app.Skills.contentSnapshot
-		})
+		waitIdle(t, app)
+		if app.Skills.ContentFile != "references/guide.md" {
+			t.Fatalf("content file %q", app.Skills.ContentFile)
+		}
 		tt.Frame()
 		if !tt.HasText("# Guide") && !tt.HasText("hello") {
 			t.Fatalf("file content missing: %q", tt.Texts())
@@ -287,13 +289,19 @@ func TestContentTabShowsSelectedFile(t *testing.T) {
 	}
 }
 
-func waitFor(t *testing.T, cond func() bool) {
+// waitIdle drains the App's pending apply queue — goroutine results
+// queued through apply() — then runs a frame so the applied state is on
+// screen. Equivalent to win.Update's delivery on the real main thread.
+func waitIdle(t *testing.T, app *App) {
 	t.Helper()
-	for i := 0; i < 200; i++ {
-		if cond() {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if app.drainApplies() == 0 && app.idle() {
 			return
 		}
-		time.Sleep(5 * time.Millisecond)
+		if time.Now().After(deadline) {
+			t.Fatal("waitIdle: apply queue did not drain")
+		}
+		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("condition not met")
 }
