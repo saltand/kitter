@@ -493,6 +493,43 @@ func TestRegistryNeverSerializesNullCollections(t *testing.T) {
 	if len(decoded.Groups) != 0 || len(decoded.AdoptedSources["a"].References) != 0 {
 		t.Fatal("nulls must normalize to empty")
 	}
+	// SkillReference inside adopted_sources round-trips serde's shape:
+	// original_target is Option<PathBuf> → null is allowed, missing is
+	// accepted; kind is a snake_case unit variant.
+	reg2 := newRegistry()
+	target := "/tmp/source"
+	reg2.AdoptedSources["adopted"] = AdoptedSource{
+		Source: "/tmp/source",
+		References: []model.SkillReference{{
+			Path:           "/proj/.agents/skills/demo",
+			Source:         "/tmp/source",
+			Kind:           model.ReferenceLink,
+			OriginalTarget: &target,
+		}, {
+			Path:   "/proj/.claude/skills/demo",
+			Source: "/tmp/source",
+			Kind:   model.ReferenceDirect,
+		}},
+	}
+	data, err = json.Marshal(reg2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = string(data)
+	if !strings.Contains(raw, `"kind":"link"`) || !strings.Contains(raw, `"kind":"direct"`) {
+		t.Fatalf("kind not snake_case: %s", raw)
+	}
+	if !strings.Contains(raw, `"original_target":"/tmp/source"`) || !strings.Contains(raw, `"original_target":null`) {
+		t.Fatalf("original_target shape wrong: %s", raw)
+	}
+	var decoded2 Registry
+	if err := json.Unmarshal(data, &decoded2); err != nil {
+		t.Fatal(err)
+	}
+	refs := decoded2.AdoptedSources["adopted"].References
+	if len(refs) != 2 || refs[0].OriginalTarget == nil || *refs[0].OriginalTarget != target || refs[1].OriginalTarget != nil {
+		t.Fatalf("round-trip %+v", refs)
+	}
 	// Round-trip a saved registry.
 	dir := t.TempDir()
 	library, err := OpenIn(dir)

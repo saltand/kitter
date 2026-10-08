@@ -26,6 +26,7 @@ import (
 	"github.com/saltand/kitter/native/core/model"
 	"github.com/saltand/kitter/native/core/project"
 	"github.com/saltand/kitter/native/core/skillfile"
+	"gopkg.in/yaml.v3"
 )
 
 // AdoptionCandidate is adoption::AdoptionCandidate.
@@ -214,9 +215,24 @@ func readMarker(path string) (string, string, error) {
 	if !closed {
 		return "", "", errors.New("frontmatter 未闭合")
 	}
-	name, description, err := skillfile.ReadFrontmatter(path)
-	if err != nil {
+	// serde_yaml deserializes Metadata{name: String, description:
+	// String}: a non-scalar YAML node (map/sequence) fails the type
+	// check before validate_name ever runs.
+	var meta struct {
+		Name        any `yaml:"name"`
+		Description any `yaml:"description"`
+	}
+	name, description := "", ""
+	if err := yaml.Unmarshal([]byte(strings.Join(header, "\n")), &meta); err != nil {
 		return "", "", err
+	}
+	if v, ok := meta.Name.(string); ok {
+		name = v
+	} else if meta.Name != nil {
+		return "", "", errors.New("frontmatter 名称无效")
+	}
+	if v, ok := meta.Description.(string); ok {
+		description = v
 	}
 	if err := skillfile.ValidateName(name); err != nil {
 		return "", "", err
