@@ -72,17 +72,25 @@ func (a *App) content(c *ui.Context, vibrant bool) {
 			ui.Text(c, a.pageTitle()).FontSize(15).Bold().SingleLine()
 		})
 		ui.Divider(c)
-		ui.Scroll(c).Grow(1).Children(func() {
-			switch a.Page {
-			case PageSkills:
+		if a.Page == PageSkills {
+			// The skills page owns its own scrolling inside the split
+			// panes, so it fills the content area directly.
+			ui.Box(c).Grow(1).MinHeight(0).MinWidth(0).Children(func() {
 				a.skillsPage(c)
-			case PageProjects:
-				a.projectsPage(c)
-			case PageSettings:
-				a.settingsPage(c)
-			}
-		})
+			})
+		} else {
+			ui.Scroll(c).Grow(1).Children(func() {
+				switch a.Page {
+				case PageProjects:
+					a.projectsPage(c)
+				case PageSettings:
+					a.settingsPage(c)
+				}
+			})
+		}
 	})
+	// Dialogs render above the page, matching Rust's dialog overlay.
+	a.deleteModal(c)
 }
 
 func (a *App) pageTitle() string {
