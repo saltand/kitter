@@ -31,7 +31,7 @@ func (a *App) requestContentSnapshot(skill *model.SkillSummary) {
 	// Resolve the directory on the UI thread; the goroutine does only
 	// read-only filesystem work so it cannot race the registry.
 	root, err := a.Library.SkillPathByStorage(storageName)
-	go func() {
+	a.spawn(func() {
 		var files []string
 		var content string
 		if err == nil {
@@ -52,8 +52,11 @@ func (a *App) requestContentSnapshot(skill *model.SkillSummary) {
 				a.Skills.ContentText = content
 			}
 		})
-	}()
+	})
 }
+
+// projectListFn is project::list (test seam).
+var projectListFn = project.List
 
 // projectSnapshot returns the cached snapshot for root, scheduling a
 // fetch if missing (project_snapshot in mod.rs).
@@ -67,8 +70,8 @@ func (a *App) projectSnapshot(c *ui.Context, root string) []model.ProjectSkill {
 	a.projectTasks[root] = true
 	gen := a.projectsGen
 	libraryDir := a.Library.Config.LibraryDir
-	go func() {
-		skills, _ := project.List(root, libraryDir)
+	a.spawn(func() {
+		skills, _ := projectListFn(root, libraryDir)
 		a.Apply(func() {
 			delete(a.projectTasks, root)
 			if gen != a.projectsGen {
@@ -76,15 +79,46 @@ func (a *App) projectSnapshot(c *ui.Context, root string) []model.ProjectSkill {
 			}
 			a.projectSnapshots[root] = skills
 		})
-	}()
+	})
 	return nil
 }
 
 // requestProjectSnapshots is KitterApp::request_project_snapshots.
 func (a *App) requestProjectSnapshots(c *ui.Context, roots []string) {
+	gen := a.projectsGen
+	var pending []string
 	for _, root := range roots {
-		a.projectSnapshot(c, root)
+		if _, ok := a.projectSnapshots[root]; !ok && !a.projectTasks[root] {
+			pending = append(pending, root)
+		}
 	}
+	if len(pending) == 0 {
+		return
+	}
+	for _, root := range pending {
+		a.projectTasks[root] = true
+	}
+	libraryDir := a.Library.Config.LibraryDir
+	a.spawn(func() {
+		type result struct {
+			path     string
+			snapshot []model.ProjectSkill
+		}
+		var results []result
+		for _, path := range pending {
+			snap, _ := projectListFn(path, libraryDir)
+			results = append(results, result{path, snap})
+		}
+		a.Apply(func() {
+			for _, r := range results {
+				if a.projectsGen != gen || !a.projectTasks[r.path] {
+					continue
+				}
+				delete(a.projectTasks, r.path)
+				a.projectSnapshots[r.path] = r.snapshot
+			}
+		})
+	})
 }
 
 // skillInstallationsAt is KitterApp::skill_installations_at.

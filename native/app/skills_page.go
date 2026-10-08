@@ -348,7 +348,9 @@ func (a *App) skillListRow(c *ui.Context, skill *model.SkillSummary, nested bool
 		row.Background(p.Selected)
 	}
 	row.ContextMenu(func(m *ui.Menu) {
-		m.Item(installLabel).Disabled(true) // install dialog is M4
+		if m.Item(installLabel).Chosen() {
+			a.openInstallDialog()
+		}
 		if !multiSelection {
 			if m.Item(revealLabel).Chosen() {
 				mygo.Shell.ShowItemInFolder(revealPath)
@@ -525,9 +527,11 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 						Key("delete-skill").Clicked() {
 						a.openLibraryDelete([]model.SkillSummary{*skill})
 					}
-					ui.Icon(c, iconSVG("download.svg")).Size(30, 30).TextColor(p.Secondary).
-						Background(p.Raised).Radius(8).
-						Label(a.T("安装技能", "Install Skill")).Tooltip(a.T("安装技能", "Install Skill"))
+					if ui.Icon(c, iconSVG("download.svg")).Size(30, 30).TextColor(p.Secondary).
+						Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+						Label(a.T("安装技能", "Install Skill")).Tooltip(a.T("安装技能", "Install Skill")).Clicked() {
+						a.openInstallDialog()
+					}
 				})
 			})
 			description := skill.Record.Description

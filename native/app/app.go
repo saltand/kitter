@@ -14,6 +14,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/saltand/kitter/native/core/config"
+	"github.com/saltand/kitter/native/core/effective"
 	"github.com/saltand/kitter/native/core/library"
 	"github.com/saltand/kitter/native/core/model"
 	"github.com/saltand/kitter/native/core/tags"
@@ -78,12 +79,32 @@ type App struct {
 	projectSnapshots map[string][]model.ProjectSkill
 	projectTasks     map[string]bool
 
+	// Projects page state (ui::ProjectsState).
+	Projects ProjectsState
+
+	// projectTagStates mirrors tags_flow.projects; the project sidebar's
+	// tag filter selection lives on Projects.SelectedProjectTagFilter.
+	projectTagStates *tags.TagState
+
+	// Context estimates per project root (context_estimates +
+	// context_estimate_tasks + scan_generation).
+	contextEstimates map[string]contextEstimateCache
+	contextTasks     map[string]bool
+
+	// Install flow (ui::InstallFlowState).
+	InstallFlow InstallFlowState
+
 	// post queues fn to run on the UI thread, as Window.Update does in
 	// the real app. Tests install a synchronous queue they drain.
 	postMu   sync.Mutex // guards only the queue itself
 	post     func(func())
 	queue    []func()
 	inflight int // apply calls queued or running, for waitIdle
+
+	// bg tracks goroutines launched for async work so tests' waitIdle
+	// can wait for them even before their Apply call lands.
+	bgMu sync.Mutex
+	bg   int
 }
 
 // SkillsState is SkillsState in ui/state.rs plus the model list.
@@ -131,15 +152,18 @@ func NewApp(dir string) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	skillTags, _ := tags.LoadTagStatesFrom(lib.DataDir)
+	skillTags, projectTags := tags.LoadTagStatesFrom(lib.DataDir)
 	a := &App{
 		Library:          lib,
 		SkillTags:        skillTags,
+		projectTagStates: projectTags,
 		Page:             PageSkills,
 		sidebarSelected:  string(PageSkills),
 		splitSize:        320,
 		projectSnapshots: map[string][]model.ProjectSkill{},
 		projectTasks:     map[string]bool{},
+		contextEstimates: map[string]contextEstimateCache{},
+		contextTasks:     map[string]bool{},
 	}
 	a.Skills.SelectedFile = "SKILL.md"
 	a.Skills.CollapsedGroups = map[string]bool{}
@@ -184,6 +208,8 @@ func (a *App) ReloadSkills() {
 	a.projectsGen++
 	a.projectSnapshots = map[string][]model.ProjectSkill{}
 	a.projectTasks = map[string]bool{}
+	a.contextEstimates = map[string]contextEstimateCache{}
+	a.contextTasks = map[string]bool{}
 	a.Skills.Selection.Reconcile(a.skillOrder())
 }
 
@@ -248,9 +274,31 @@ func (a *App) drainApplies() int {
 	return len(queued)
 }
 
+// spawn runs fn in a tracked background goroutine: waitIdle waits for
+// it even before the trailing Apply lands.
+func (a *App) spawn(fn func()) {
+	a.bgMu.Lock()
+	a.bg++
+	a.bgMu.Unlock()
+	go func() {
+		defer func() {
+			a.bgMu.Lock()
+			a.bg--
+			a.bgMu.Unlock()
+		}()
+		fn()
+	}()
+}
+
 // idle reports whether every apply closure has run to completion: none
 // queued and none running. Tests wait on it in waitIdle.
 func (a *App) idle() bool {
+	a.bgMu.Lock()
+	if a.bg > 0 {
+		a.bgMu.Unlock()
+		return false
+	}
+	a.bgMu.Unlock()
 	a.postMu.Lock()
 	defer a.postMu.Unlock()
 	return a.inflight == 0
@@ -267,6 +315,10 @@ func homeDir() string {
 
 // showNotice is KitterApp::show_notice (toast; mygo auto-dismisses).
 func (a *App) showNotice(c *ui.Context, message string) {
+	if c == nil {
+		a.notice(message)
+		return
+	}
 	c.Toast(message)
 }
 
@@ -298,3 +350,47 @@ func (a *App) persistTags() {
 func tick() uint64 { return uint64(time.Now().UnixNano()) }
 
 var _ = tick
+
+// ProjectsState is ui::ProjectsState.
+type ProjectsState struct {
+	OpenProject            string // "" == None
+	GlobalProjectView      bool
+	ProjectSkillsTab       ProjectSkillsTab
+	SelectedProjectAgent   *effective.AgentKind
+	ProjectAgentsExpanded  bool
+	ExpandedProjectPlugins map[string]bool
+	Search                 string
+	// SelectedProjectTagFilter is ui::tags_flow.selected_project_filter
+	// (0 = no filter).
+	SelectedProjectTagFilter tags.TagID
+}
+
+// ProjectTags returns the project TagState (tags_flow.projects).
+func (a *App) ProjectTags() *tags.TagState { return a.projectTagStates }
+
+// projectTagKey is project_tag_key (the project's path string).
+func projectTagKey(path string) string { return path }
+
+// ProjectSkillsTab is ui::ProjectSkillsTab.
+type ProjectSkillsTab int
+
+const (
+	ProjectTabSkills ProjectSkillsTab = iota
+	ProjectTabPlugins
+)
+
+// InstallFlowState is ui::InstallFlowState.
+type InstallFlowState struct {
+	Modal           bool
+	Global          bool
+	SelectedTargets map[model.InstallTarget]bool
+}
+
+// contextEstimateCache is ui::ContextEstimateCache.
+type contextEstimateCache struct {
+	scannedAt time.Time
+	estimates []effective.AgentContextEstimate
+}
+
+// contextEstimateCacheTTL is CONTEXT_ESTIMATE_CACHE_TTL.
+const contextEstimateCacheTTL = 2 * time.Hour

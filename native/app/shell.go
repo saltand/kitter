@@ -96,6 +96,7 @@ func (a *App) content(c *ui.Context, vibrant bool) {
 	// Dialogs render above the page, matching Rust's dialog overlay.
 	a.deleteModal(c)
 	a.addDialog(c)
+	a.installDialog(c)
 }
 
 func (a *App) pageTitle() string {
