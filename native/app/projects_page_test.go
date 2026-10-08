@@ -12,6 +12,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/saltand/kitter/native/core/model"
+	"github.com/saltand/kitter/native/core/effective"
 )
 
 // TestAddProjectPersistsToConfig is browse_project → remember_project:
@@ -186,33 +187,130 @@ func TestUninstallRemovesLinks(t *testing.T) {
 	}
 }
 
-// TestStaleScanDoesNotClobberNewProject: a slow scan returning for a
-// previous project is discarded by the generation guard after switching.
+// TestStaleScanDoesNotClobberNewProject drives the real user path:
+// open p1 (scan blocks), switch to p2 (scan completes first), then let
+// p1's late result land. The detail pane must show p2's data, never
+// p1's — the per-path snapshot cache keeps them separate.
 func TestStaleScanDoesNotClobberNewProject(t *testing.T) {
 	app := newTestApp(t)
 	p1 := t.TempDir()
+	p2 := t.TempDir()
 
+	type gate struct{ started, release chan struct{} }
+	gates := map[string]*gate{
+		p1: {make(chan struct{}), make(chan struct{})},
+		p2: {make(chan struct{}), make(chan struct{})},
+	}
 	old := projectListFn
 	defer func() { projectListFn = old }()
-	release := make(chan string, 8)
 	projectListFn = func(path, lib string) ([]model.ProjectSkill, error) {
-		release <- path
-		<-release // block until test lets each call finish
-		return []model.ProjectSkill{{Name: "stale-" + filepath.Base(path)}}, nil
+		g := gates[path]
+		if g == nil {
+			return nil, nil
+		}
+		close(g.started)
+		<-g.release
+		return []model.ProjectSkill{{Name: "skill-" + filepath.Base(path)}}, nil
 	}
 
-	// Trigger a scan for p1 then immediately switch to p2 (bumping the
-	// generation counter).
-	app.requestProjectSnapshots(nil, []string{p1})
-	started := <-release // the goroutine reached the scan for p1
-	_ = started
-	a := app
-	a.projectsGen++ // invalidate as selectProject would
-	// Now let the scan finish; the result must be discarded.
-	release <- ""
-	waitIdle(t, app)
+	app.Page = PageProjects
+	// The detail pane's skill names come from the effective-skill
+	// estimate, not the snapshot — stub it empty so only sidebar counts
+	// and the cache are observable.
+	oldEst := estimateProjectFn
+	defer func() { estimateProjectFn = oldEst }()
+	estimateProjectFn = func(string) []effective.AgentContextEstimate { return nil }
 
-	if _, ok := a.projectSnapshots[p1]; ok {
-		t.Fatal("stale snapshot for p1 must be discarded")
+	app.Library.Config.RememberProject(p1)
+	app.Library.Config.RememberProject(p2)
+	app.selectProject(p1)
+	tt := ui.NewTester(app.View, 1200, 720)
+	app.requestProjectSnapshots(nil, []string{p1})
+	<-gates[p1].started // p1's scan is now blocked inside projectListFn
+
+	// Switch to p2 through the real action; its scan must finish first.
+	app.selectProject(p2)
+	tt.Frame()
+	<-gates[p2].started
+	close(gates[p2].release)
+	// p1 is still blocked; let it finish too so waitIdle can drain,
+	// then render. p2's data was already committed first.
+	close(gates[p1].release)
+	waitIdle(t, app)
+	tt.Frame()
+
+	// p2's snapshot lives in its own cache slot; the open project sees
+	// only that entry.
+	if got := len(app.projectSnapshots[p2]); got != 1 {
+		t.Fatalf("p2 snapshot %d, want 1", got)
+	}
+	if app.projectSnapshots[p2][0].Name != "skill-"+filepath.Base(p2) {
+		t.Fatalf("p2 snapshot = %q", app.projectSnapshots[p2][0].Name)
+	}
+	// p1's late result still landed — but only under p1's key, so the
+	// p2 detail never reads it.
+	if len(app.projectSnapshots[p1]) == 0 {
+		t.Fatal("p1 snapshot should still be cached under p1")
+	}
+	if app.projectSnapshots[p1][0].Name != "skill-"+filepath.Base(p1) {
+		t.Fatalf("p1 snapshot = %q", app.projectSnapshots[p1][0].Name)
+	}
+	_ = tt
+}
+
+// TestStaleEstimateDoesNotClobberNewProject is the same ordering test
+// for context_estimate_snapshot: p1's slow estimate must not render
+// into p2's agent cards.
+func TestStaleEstimateDoesNotClobberNewProject(t *testing.T) {
+	app := newTestApp(t)
+	p1 := t.TempDir()
+	p2 := t.TempDir()
+
+	type gate struct{ started, release chan struct{} }
+	gates := map[string]*gate{
+		p1: {make(chan struct{}), make(chan struct{})},
+		p2: {make(chan struct{}), make(chan struct{})},
+	}
+	old := estimateProjectFn
+	defer func() { estimateProjectFn = old }()
+	estimateProjectFn = func(path string) []effective.AgentContextEstimate {
+		g := gates[path]
+		if g == nil {
+			return nil
+		}
+		close(g.started)
+		<-g.release
+		return []effective.AgentContextEstimate{{
+			Agent:             effective.AgentClaudeCode,
+			EstimatedTokens:   42,
+			ModelVisibleCount: 1,
+			Skills: []effective.EffectiveSkill{{
+				Name: "skill-" + filepath.Base(path),
+			}},
+		}}
+	}
+
+	app.Page = PageProjects
+	app.selectProject(p1)
+	tt := ui.NewTester(app.View, 1200, 720)
+	// Trigger the estimate request for p1 (the detail pane calls it in
+	// projectDetail).
+	app.contextEstimateSnapshot(p1)
+	<-gates[p1].started
+
+	app.selectProject(p2)
+	tt.Frame()
+	<-gates[p2].started
+	close(gates[p2].release)
+	// Release p1's late estimate too, then drain and render — the
+	// detail pane must only ever show p2's card data.
+	close(gates[p1].release)
+	waitIdle(t, app)
+	tt.Frame()
+	if !tt.HasText("skill-" + filepath.Base(p2)) {
+		t.Fatalf("p2 estimate missing: %q", tt.Texts())
+	}
+	if tt.HasText("skill-" + filepath.Base(p1)) {
+		t.Fatalf("stale p1 estimate rendered for p2: %q", tt.Texts())
 	}
 }
