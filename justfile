@@ -59,3 +59,21 @@ run: app
 
 release: check package
     @echo "Release ready: {{dmg}}"
+
+# --- Go/MyGo port (native/) ------------------------------------------------
+
+# vet + race tests + mygo vet
+go-check:
+    cd native && go vet ./... && go test -race -count=3 ./... && go tool mygo vet .
+
+# Standalone CLI
+go-cli:
+    cd native && go build -o build/kitter ./cmd/kitter
+
+# .app bundle + dmg (code signing/dmg/notarize require macOS)
+go-app:
+    cd native && go tool mygo build -platform darwin/arm64
+
+# Dev server
+go-run:
+    cd native && go tool mygo dev
