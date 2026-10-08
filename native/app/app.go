@@ -94,6 +94,15 @@ type App struct {
 	// Install flow (ui::InstallFlowState).
 	InstallFlow InstallFlowState
 
+	// Organize flows (ui::TagsFlowState + ui::GroupsFlowState).
+	TagsFlow   TagsFlow
+	GroupsFlow GroupsFlow
+
+	// Update checks (model.checking_updates / updating_skill in Rust).
+	CheckingUpdates bool
+	UpdatingSkill   string
+	UpdateCount     int
+
 	// post queues fn to run on the UI thread, as Window.Update does in
 	// the real app. Tests install a synchronous queue they drain.
 	postMu   sync.Mutex // guards only the queue itself
@@ -340,10 +349,9 @@ func (a *App) persistCollapsedGroups() {
 	_ = a.Library.Config.SaveTo(a.Library.DataDir)
 }
 
-// persistTags persists the skills tag state (persist_tags).
+// persistTags persists both scopes' tag states (persist_tags).
 func (a *App) persistTags() {
-	_, projects := tags.LoadTagStatesFrom(a.Library.DataDir)
-	_ = tags.SaveTagStatesTo(a.Library.DataDir, a.SkillTags, projects)
+	_ = tags.SaveTagStatesTo(a.Library.DataDir, a.SkillTags, a.projectTagStates)
 }
 
 // tick is a clock for staleness comparisons where Rust uses Instant.

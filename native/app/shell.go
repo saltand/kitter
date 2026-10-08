@@ -97,6 +97,11 @@ func (a *App) content(c *ui.Context, vibrant bool) {
 	a.deleteModal(c)
 	a.addDialog(c)
 	a.installDialog(c)
+	a.tagsDialog(c)
+	a.assignTagsDialog(c)
+	a.groupsDialog(c)
+	a.deleteGroupDialog(c)
+	a.moveGroupDialog(c)
 }
 
 func (a *App) pageTitle() string {

@@ -265,8 +265,13 @@ func (a *App) groupHeaderRow(c *ui.Context, groups []model.SkillGroup, groupID s
 		AlignItems(ui.Center).TextColor(p.Secondary).Cursor(ui.CursorPointer).
 		Key("skill-group-" + groupID).
 		ContextMenu(func(m *ui.Menu) {
-			m.Item(a.T("重命名", "Rename")).Disabled(true) // group editing is M5
-			m.Item(a.T("删除分组", "Delete group")).Disabled(true)
+			if m.Item(a.T("重命名", "Rename")).Chosen() {
+				a.startGroupEdit(GroupEdit{Kind: GroupEditRename, ID: groupID})
+				a.GroupsFlow.Open = true
+			}
+			if m.Item(a.T("删除分组", "Delete group")).Chosen() {
+				a.openGroupDeleteDialog(groupID)
+			}
 		})
 	header.Children(func() {
 		ui.Icon(c, iconSVG(chevron)).TextColor(p.Muted)
@@ -362,9 +367,13 @@ func (a *App) skillListRow(c *ui.Context, skill *model.SkillSummary, nested bool
 				}
 			}
 		}
-		m.Item(setTagsLabel).Disabled(true) // tag dialog is M5
+		if m.Item(setTagsLabel).Chosen() {
+			a.openTagAssignmentDialogForSelection(a.Skills.Selection.SelectedIn(a.skillOrder()))
+		}
 		if !protected {
-			m.Item(moveLabel).Disabled(true) // group dialogs are M5
+			if m.Item(moveLabel).Chosen() {
+				a.openMoveGroupDialogForSelection(a.Skills.Selection.SelectedIn(a.skillOrder()))
+			}
 			if m.Item(deleteLabel).Chosen() {
 				targets := a.selectedLibraryTargets()
 				if len(targets) == 0 {
@@ -518,8 +527,12 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 				})
 				ui.Row(c).Gap(8).Children(func() {
 					if skill.Record.UpdateAvailable {
-						ui.Icon(c, iconSVG("rotate-cw.svg")).Size(30, 30).TextColor(p.Secondary).
-							Label(a.T("更新", "Update")).Tooltip(a.T("更新", "Update"))
+						if ui.Icon(c, iconSVG("rotate-cw.svg")).Size(30, 30).TextColor(p.Secondary).
+							Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+							Label(a.T("更新", "Update")).Tooltip(a.T("更新", "Update")).
+							Key("update-skill").Clicked() {
+							a.updateSkill(storageName)
+						}
 					}
 					if ui.Icon(c, iconSVG("trash.svg")).Size(30, 30).TextColor(p.Danger).
 						Background(p.DangerSoft).Radius(8).Cursor(ui.CursorPointer).
