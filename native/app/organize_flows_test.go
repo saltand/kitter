@@ -166,15 +166,44 @@ func TestLanguageSwitchPersists(t *testing.T) {
 	}
 }
 
-// TestCheckUpdatesShowsBadge renders the settings update row while
-// the count flag is set — the row turns into an "Updates (N)" badge.
-func TestCheckUpdatesShowsBadge(t *testing.T) {
+// TestCheckUpdatesEndToEnd drives the real checkAllUpdates flow: a
+// local-origin skill whose source dir changed → the check marks it
+// UpdateAvailable → the settings badge shows the count → updateSkill
+// refreshes the copy and the flag clears.
+func TestCheckUpdatesEndToEnd(t *testing.T) {
 	app := newTestApp(t)
-	app.UpdateCount = 2
+	skill := importSkill(t, app, "local-skill", "demo")
+	storage := SkillStorageName(&skill)
+
+	// Change the source so check_updates sees a drift.
+	src := skill.Record.Origin.Path
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"),
+		[]byte("---\nname: local-skill\ndescription: v2\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	app.checkAllUpdates()
+	waitIdle(t, app)
+
+	if app.UpdateCount != 1 {
+		t.Fatalf("UpdateCount %d, want 1", app.UpdateCount)
+	}
+	if !findSkill(t, app, "local-skill").Record.UpdateAvailable {
+		t.Fatal("update_available flag not set")
+	}
+
+	// The badge renders on the settings page.
 	app.Page = PageSettings
 	tt := ui.NewTester(app.View, 1200, 720)
-	if !tt.HasText("Updates (2)") && !tt.HasText("可更新 (2)") {
+	if !tt.HasText("Updates (1)") && !tt.HasText("可更新 (1)") {
 		t.Fatalf("update badge missing: %q", tt.Texts())
+	}
+
+	// updateSkill refreshes the copy and clears the flag.
+	app.updateSkill(storage)
+	waitIdle(t, app)
+	if findSkill(t, app, "local-skill").Record.UpdateAvailable {
+		t.Fatal("update_available flag should clear after update")
 	}
 }
 
