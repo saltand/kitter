@@ -84,41 +84,31 @@ func (a *App) projectSnapshot(c *ui.Context, root string) []model.ProjectSkill {
 }
 
 // requestProjectSnapshots is KitterApp::request_project_snapshots.
+// Rust spawns one detached task per pending path, so a slow project
+// never blocks another project's scan.
 func (a *App) requestProjectSnapshots(c *ui.Context, roots []string) {
 	gen := a.projectsGen
-	var pending []string
 	for _, root := range roots {
-		if _, ok := a.projectSnapshots[root]; !ok && !a.projectTasks[root] {
-			pending = append(pending, root)
+		if _, ok := a.projectSnapshots[root]; ok {
+			continue
 		}
-	}
-	if len(pending) == 0 {
-		return
-	}
-	for _, root := range pending {
+		if a.projectTasks[root] {
+			continue
+		}
 		a.projectTasks[root] = true
-	}
-	libraryDir := a.Library.Config.LibraryDir
-	a.spawn(func() {
-		type result struct {
-			path     string
-			snapshot []model.ProjectSkill
-		}
-		var results []result
-		for _, path := range pending {
-			snap, _ := projectListFn(path, libraryDir)
-			results = append(results, result{path, snap})
-		}
-		a.Apply(func() {
-			for _, r := range results {
-				if a.projectsGen != gen || !a.projectTasks[r.path] {
-					continue
+		path := root
+		libraryDir := a.Library.Config.LibraryDir
+		a.spawn(func() {
+			snapshot, _ := projectListFn(path, libraryDir)
+			a.Apply(func() {
+				if a.projectsGen != gen || !a.projectTasks[path] {
+					return
 				}
-				delete(a.projectTasks, r.path)
-				a.projectSnapshots[r.path] = r.snapshot
-			}
+				delete(a.projectTasks, path)
+				a.projectSnapshots[path] = snapshot
+			})
 		})
-	})
+	}
 }
 
 // skillInstallationsAt is KitterApp::skill_installations_at.
