@@ -146,9 +146,12 @@ func (a *App) skillListPane(c *ui.Context, t *ui.Theme, rows []listEntry, groups
 				ui.Text(c, a.T("技能", "Skills")).FontSize(14).Bold().SingleLine()
 				ui.Text(c, fmt.Sprint(len(a.Skills.Items))).Font(FontMono).FontSize(12).TextColor(p.Muted)
 			})
-			ui.Icon(c, iconSVG("plus.svg")).Size(28, 28).TextColor(p.Text).
+			if ui.Icon(c, iconSVG("plus.svg")).Size(28, 28).TextColor(p.Text).
 				Tooltip(a.T("添加技能", "Add Skill")).
-				Label(a.T("添加技能", "Add Skill"))
+				Label(a.T("添加技能", "Add Skill")).
+				Cursor(ui.CursorPointer).Clicked() {
+				a.openAddModal(AddLocal)
+			}
 		})
 		ui.Divider(c)
 

@@ -16,6 +16,10 @@ const sidebarWidth = 180.0
 
 // View is the root view function (KitterApp::render).
 func (a *App) View(c *ui.Context) {
+	if a.pendingNotice != "" {
+		c.Toast(a.pendingNotice)
+		a.pendingNotice = ""
+	}
 	p := a.Palette()
 
 	// A vibrant window shows through wherever the view draws nothing:
@@ -91,6 +95,7 @@ func (a *App) content(c *ui.Context, vibrant bool) {
 	})
 	// Dialogs render above the page, matching Rust's dialog overlay.
 	a.deleteModal(c)
+	a.addDialog(c)
 }
 
 func (a *App) pageTitle() string {

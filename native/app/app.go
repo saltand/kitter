@@ -58,6 +58,13 @@ type App struct {
 	// Skills page state (ui::state::SkillsState).
 	Skills SkillsState
 
+	// AddSkill flow (ui/state.rs AddFlowState on KitterApp).
+	AddFlow AddFlowState
+
+	// pendingNotice is a notice set outside a frame (goroutine
+	// completions); View consumes it into a toast.
+	pendingNotice string
+
 	sidebarSelected string
 	splitSize       float32
 	skillList       ui.ListState
@@ -261,6 +268,13 @@ func homeDir() string {
 // showNotice is KitterApp::show_notice (toast; mygo auto-dismisses).
 func (a *App) showNotice(c *ui.Context, message string) {
 	c.Toast(message)
+}
+
+// notice sets a transient message shown on the next frame, used when
+// there is no live *ui.Context (goroutine completions). View renders it
+// as a toast overlay.
+func (a *App) notice(message string) {
+	a.pendingNotice = message
 }
 
 // persistCollapsedGroups is KitterApp::persist_collapsed_groups
