@@ -152,3 +152,10 @@ func codexManualOnly(skillDir string) bool {
 	}
 	return !*data.Policy.AllowImplicitInvocation
 }
+
+// approxTokenCount is approx_token_count: ceil(len/4), the
+// provider-independent estimate used when an exact tokenizer is not
+// available.
+func approxTokenCount(rendered string) int {
+	return (len(rendered) + 3) / 4
+}
