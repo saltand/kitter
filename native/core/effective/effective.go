@@ -5,6 +5,7 @@
 package effective
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -158,4 +159,10 @@ func codexManualOnly(skillDir string) bool {
 // available.
 func approxTokenCount(rendered string) int {
 	return (len(rendered) + 3) / 4
+}
+
+// jsonUnmarshal is encoding/json.Unmarshal, wrapped to keep call sites
+// one line.
+func jsonUnmarshal(data []byte, v any) error {
+	return json.Unmarshal(data, v)
 }
