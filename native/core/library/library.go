@@ -60,13 +60,11 @@ func (r *Registry) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// AdoptedSource mirrors the private AdoptedSource struct. References are
-// serialized by the adoption module (M3); the field type is raw JSON to
-// keep the registry schema compatible today.
+// AdoptedSource mirrors the private AdoptedSource struct.
 type AdoptedSource struct {
-	Source          string            `json:"source"`
-	References      []json.RawMessage `json:"references"`
-	PreviousLibrary *string           `json:"previous_library,omitempty"`
+	Source          string                 `json:"source"`
+	References      []model.SkillReference `json:"references"`
+	PreviousLibrary *string                `json:"previous_library,omitempty"`
 }
 
 // MarshalJSON keeps references a (possibly empty) array: Rust declares it
@@ -75,7 +73,7 @@ func (s AdoptedSource) MarshalJSON() ([]byte, error) {
 	type alias AdoptedSource
 	a := alias(s)
 	if a.References == nil {
-		a.References = []json.RawMessage{}
+		a.References = []model.SkillReference{}
 	}
 	return json.Marshal(a)
 }
@@ -89,7 +87,7 @@ func (s *AdoptedSource) UnmarshalJSON(data []byte) error {
 	}
 	*s = AdoptedSource(a)
 	if s.References == nil {
-		s.References = []json.RawMessage{}
+		s.References = []model.SkillReference{}
 	}
 	return nil
 }
@@ -655,7 +653,24 @@ func (l *SkillLibrary) RemoveByStorage(storageName string) error {
 		}
 	}
 	if adopted, ok := l.Registry.AdoptedSources[storageName]; ok {
-		_ = adopted // adoption reference cleanup lands with M3 (adoption)
+		for _, reference := range adopted.References {
+			if reference.Kind != model.ReferenceLink {
+				continue
+			}
+			link, err := fslink.Inspect(reference.Path)
+			if err != nil {
+				return err
+			}
+			if link == nil {
+				continue
+			}
+			// Never remove a reference that another tool/user repointed.
+			if resolved, err := filepath.EvalSymlinks(reference.Path); err == nil && resolved == adopted.Source {
+				if err := fslink.Remove(reference.Path, *link); err != nil {
+					return err
+				}
+			}
+		}
 	}
 	if dl, err := fslink.Inspect(path); err != nil {
 		return err

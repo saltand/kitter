@@ -452,3 +452,29 @@ type ProjectSkillInstallation struct {
 	Path    string        `json:"path"`
 	Managed bool          `json:"managed"`
 }
+
+// ReferenceKind is adoption::ReferenceKind, kept here so library can
+// persist adopted references without importing the adoption package.
+//
+// serde: #[serde(rename_all = "snake_case")] unit enum → plain string.
+type ReferenceKind string
+
+const (
+	ReferenceLink   ReferenceKind = "link"
+	ReferenceDirect ReferenceKind = "direct"
+	ReferenceAlias  ReferenceKind = "alias"
+	ReferencePlugin ReferenceKind = "plugin"
+)
+
+// SkillReference is adoption::SkillReference: one observed installation
+// reference of an adopted skill, persisted in registry.adopted_sources.
+//
+// serde: path and source are PathBuf (plain strings); kind is a
+// snake_case unit variant; original_target is Option<PathBuf> with no
+// skip attribute → serializes as null when absent.
+type SkillReference struct {
+	Path           string        `json:"path"`
+	Source         string        `json:"source"`
+	Kind           ReferenceKind `json:"kind"`
+	OriginalTarget *string       `json:"original_target"`
+}

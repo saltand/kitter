@@ -20,6 +20,7 @@ var allowedNullFields = map[string]bool{
 	"subdir":           true, // Option<String> without skip_serializing_if
 	"previous_library": true, // Option<PathBuf>
 	"parent":           true, // tags::Tag.parent, Option<TagId>
+	"original_target":  true, // adoption::SkillReference.original_target, Option<PathBuf>
 }
 
 // collectNulls walks decoded JSON and returns every "path → null" pair.
