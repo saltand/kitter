@@ -76,23 +76,90 @@ const (
 )
 
 // AppConfig mirrors config::AppConfig in config.json.
+//
+// serde note: recent_projects/project_activity are #[serde(default)],
+// which tolerates a missing key but not an explicit null; marshal and
+// unmarshal below keep nil off the wire and accept null when reading.
 type AppConfig struct {
 	Language        Language          `json:"language"`
 	Theme           Theme             `json:"theme"`
 	LibraryDir      string            `json:"library_dir"`
 	RecentProjects  []string          `json:"recent_projects"`
 	ProjectActivity map[string]uint64 `json:"project_activity"`
+	// CollapsedSkillGroups mirrors collapsed_skill_groups (BTreeSet → a
+	// sorted JSON array), added by feat/persist-collapsed.
+	CollapsedSkillGroups map[string]bool `json:"-"`
+}
+
+type appConfigJSON struct {
+	Language             Language          `json:"language"`
+	Theme                Theme             `json:"theme"`
+	LibraryDir           string            `json:"library_dir"`
+	RecentProjects       []string          `json:"recent_projects"`
+	ProjectActivity      map[string]uint64 `json:"project_activity"`
+	CollapsedSkillGroups []string          `json:"collapsed_skill_groups"`
+}
+
+func (c *AppConfig) normalize() {
+	if c.RecentProjects == nil {
+		c.RecentProjects = []string{}
+	}
+	if c.ProjectActivity == nil {
+		c.ProjectActivity = map[string]uint64{}
+	}
+	if c.CollapsedSkillGroups == nil {
+		c.CollapsedSkillGroups = map[string]bool{}
+	}
+}
+
+// MarshalJSON emits empty collections instead of null and the collapsed
+// group set as a BTreeSet-style sorted array.
+func (c AppConfig) MarshalJSON() ([]byte, error) {
+	c.normalize()
+	groups := make([]string, 0, len(c.CollapsedSkillGroups))
+	for id := range c.CollapsedSkillGroups {
+		groups = append(groups, id)
+	}
+	sort.Strings(groups)
+	return json.Marshal(appConfigJSON{
+		Language:             c.Language,
+		Theme:                c.Theme,
+		LibraryDir:           c.LibraryDir,
+		RecentProjects:       c.RecentProjects,
+		ProjectActivity:      c.ProjectActivity,
+		CollapsedSkillGroups: groups,
+	})
+}
+
+// UnmarshalJSON accepts missing or null collection fields.
+func (c *AppConfig) UnmarshalJSON(data []byte) error {
+	var j appConfigJSON
+	if err := json.Unmarshal(data, &j); err != nil {
+		return err
+	}
+	c.Language = j.Language
+	c.Theme = j.Theme
+	c.LibraryDir = j.LibraryDir
+	c.RecentProjects = j.RecentProjects
+	c.ProjectActivity = j.ProjectActivity
+	c.CollapsedSkillGroups = map[string]bool{}
+	for _, id := range j.CollapsedSkillGroups {
+		c.CollapsedSkillGroups[id] = true
+	}
+	c.normalize()
+	return nil
 }
 
 // Default returns the serde defaults: language/theme "system", an empty
 // project list, and the library under the data directory.
 func Default() AppConfig {
 	return AppConfig{
-		Language:        LanguageSystem,
-		Theme:           ThemeSystem,
-		LibraryDir:      filepath.Join(AppDataDir(), "skills"),
-		RecentProjects:  []string{},
-		ProjectActivity: map[string]uint64{},
+		Language:             LanguageSystem,
+		Theme:                ThemeSystem,
+		LibraryDir:           filepath.Join(AppDataDir(), "skills"),
+		RecentProjects:       []string{},
+		ProjectActivity:      map[string]uint64{},
+		CollapsedSkillGroups: map[string]bool{},
 	}
 }
 
@@ -150,12 +217,7 @@ func LoadFrom(dataDir string) (*AppConfig, error) {
 	if err := json.Unmarshal(bytes, &cfg); err != nil {
 		return nil, fmt.Errorf("配置格式无效: %w", err)
 	}
-	if cfg.RecentProjects == nil {
-		cfg.RecentProjects = []string{}
-	}
-	if cfg.ProjectActivity == nil {
-		cfg.ProjectActivity = map[string]uint64{}
-	}
+	cfg.normalize()
 	return &cfg, nil
 }
 

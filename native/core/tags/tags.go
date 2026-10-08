@@ -44,21 +44,26 @@ func (s *TagState) normalize() {
 	if s.Assignments == nil {
 		s.Assignments = map[string][]TagID{}
 	}
-	// BTreeSet serializes as a sorted array.
+	// BTreeSet serializes as a sorted array; a nil slice would serialize
+	// as null, which serde's #[serde(default)] cannot read back.
 	for k, ids := range s.Assignments {
+		if ids == nil {
+			ids = []TagID{}
+		}
 		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 		s.Assignments[k] = ids
 	}
 }
 
-// MarshalJSON emits sorted assignment arrays like a BTreeSet.
-func (s TagState) MarshalJSON() ([]byte, error) {
+// MarshalJSON emits sorted assignment arrays like a BTreeSet, and never
+// null for the Vec/BTreeMap fields (serde's #[serde(default)] rejects it).
+func (s *TagState) MarshalJSON() ([]byte, error) {
 	s.normalize()
 	type alias TagState
-	return json.Marshal(alias(s))
+	return json.Marshal((*alias)(s))
 }
 
-// UnmarshalJSON accepts missing fields (serde default).
+// UnmarshalJSON accepts missing or null fields (serde default).
 func (s *TagState) UnmarshalJSON(data []byte) error {
 	type alias TagState
 	var a alias

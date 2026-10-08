@@ -15,6 +15,11 @@ import (
 
 func newTestApp(t *testing.T) *App {
 	t.Helper()
+	// Without the embedded JetBrains Mono the text system can't lay out
+	// mono labels, which then have no box for the tester to click.
+	if err := RegisterFonts(); err != nil {
+		t.Logf("register fonts: %v", err)
+	}
 	dir := t.TempDir()
 	t.Setenv("KITTER_HOME", dir)
 	app, err := NewApp(dir)

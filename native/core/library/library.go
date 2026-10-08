@@ -29,12 +29,35 @@ const KitterSkillStorage = "_kitter-builtin"
 const kitterSkillName = "kitter"
 
 // Registry mirrors the private Registry struct in library.rs.
+//
+// serde note: every collection field is #[serde(default)], which tolerates
+// a missing key but not an explicit null. Marshal/Unmarshal below keep the
+// Go nil representation off the wire and accept null when reading.
 type Registry struct {
 	Skills               map[string]model.SkillRecord       `json:"skills"`
 	Sources              map[string]model.SkillSourceRecord `json:"sources"`
 	Groups               []model.SkillGroup                 `json:"groups"`
 	SourceGroupsMigrated bool                               `json:"source_groups_migrated"`
 	AdoptedSources       map[string]AdoptedSource           `json:"adopted_sources"`
+}
+
+// MarshalJSON emits empty collections instead of null.
+func (r *Registry) MarshalJSON() ([]byte, error) {
+	type alias Registry
+	r.normalize()
+	return json.Marshal((*alias)(r))
+}
+
+// UnmarshalJSON accepts missing or null collection fields.
+func (r *Registry) UnmarshalJSON(data []byte) error {
+	type alias Registry
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*r = Registry(a)
+	r.normalize()
+	return nil
 }
 
 // AdoptedSource mirrors the private AdoptedSource struct. References are
@@ -44,6 +67,31 @@ type AdoptedSource struct {
 	Source          string            `json:"source"`
 	References      []json.RawMessage `json:"references"`
 	PreviousLibrary *string           `json:"previous_library,omitempty"`
+}
+
+// MarshalJSON keeps references a (possibly empty) array: Rust declares it
+// without serde(default), so it must be present and non-null.
+func (s AdoptedSource) MarshalJSON() ([]byte, error) {
+	type alias AdoptedSource
+	a := alias(s)
+	if a.References == nil {
+		a.References = []json.RawMessage{}
+	}
+	return json.Marshal(a)
+}
+
+// UnmarshalJSON accepts a missing or null references array.
+func (s *AdoptedSource) UnmarshalJSON(data []byte) error {
+	type alias AdoptedSource
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*s = AdoptedSource(a)
+	if s.References == nil {
+		s.References = []json.RawMessage{}
+	}
+	return nil
 }
 
 func newRegistry() *Registry {

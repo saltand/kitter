@@ -358,6 +358,40 @@ type SkillSourceRecord struct {
 	AddedSkills      []string    `json:"added_skills"`
 }
 
+// serde note: #[serde(default)] tolerates a missing field but NOT an
+// explicit null, so the Go side must never emit "discovered_skills":null
+// and must accept it when reading.
+
+// MarshalJSON keeps the Vec fields non-null.
+func (r SkillSourceRecord) MarshalJSON() ([]byte, error) {
+	type alias SkillSourceRecord
+	a := alias(r)
+	if a.DiscoveredSkills == nil {
+		a.DiscoveredSkills = []string{}
+	}
+	if a.AddedSkills == nil {
+		a.AddedSkills = []string{}
+	}
+	return json.Marshal(a)
+}
+
+// UnmarshalJSON accepts missing or null Vec fields (serde default).
+func (r *SkillSourceRecord) UnmarshalJSON(data []byte) error {
+	type alias SkillSourceRecord
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*r = SkillSourceRecord(a)
+	if r.DiscoveredSkills == nil {
+		r.DiscoveredSkills = []string{}
+	}
+	if r.AddedSkills == nil {
+		r.AddedSkills = []string{}
+	}
+	return nil
+}
+
 // SkillRecord is one library entry in registry.json.
 type SkillRecord struct {
 	Name            string      `json:"name"`

@@ -466,3 +466,44 @@ func TestRegistryJSONRoundTrip(t *testing.T) {
 		t.Fatal("re-save corrupted registry")
 	}
 }
+
+func TestRegistryNeverSerializesNullCollections(t *testing.T) {
+	// serde #[serde(default)] reads a missing key but not a null; the Go
+	// types must emit empty collections instead.
+	reg := newRegistry()
+	reg.AdoptedSources["adopted"] = AdoptedSource{Source: "/tmp/src"}
+	data, err := json.Marshal(reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(data)
+	for _, field := range []string{"skills", "sources", "groups", "adopted_sources"} {
+		if strings.Contains(raw, `"`+field+`":null`) {
+			t.Fatalf("%s serialized as null: %s", field, raw)
+		}
+	}
+	if !strings.Contains(raw, `"references":[]`) {
+		t.Fatalf("references must serialize as []: %s", raw)
+	}
+	// And explicit nulls must be accepted on the way back.
+	var decoded Registry
+	if err := json.Unmarshal([]byte(`{"skills":null,"sources":null,"groups":null,"adopted_sources":{"a":{"source":"/s","references":null,"previous_library":null}}}`), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Groups) != 0 || len(decoded.AdoptedSources["a"].References) != 0 {
+		t.Fatal("nulls must normalize to empty")
+	}
+	// Round-trip a saved registry.
+	dir := t.TempDir()
+	library, err := OpenIn(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err = json.Marshal(library.Registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), ":null") {
+		t.Fatalf("registry contains null: %s", data)
+	}
+}

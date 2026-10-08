@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -137,4 +138,54 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func TestConfigNeverSerializesNullCollections(t *testing.T) {
+	// serde #[serde(default)] reads a missing key but not a null.
+	cfg := AppConfig{}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(data)
+	if strings.Contains(raw, `"recent_projects":null`) || strings.Contains(raw, `"project_activity":null`) {
+		t.Fatalf("config contains null: %s", raw)
+	}
+	var decoded AppConfig
+	if err := json.Unmarshal([]byte(`{"language":"system","theme":"system","library_dir":"/x","recent_projects":null,"project_activity":null}`), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.RecentProjects == nil || decoded.ProjectActivity == nil {
+		t.Fatal("nulls must normalize to empty")
+	}
+}
+
+// feat/persist-collapsed: collapsed_skill_groups round-trips and defaults
+// empty for older config files.
+func TestCollapsedSkillGroupsRoundTripAndDefault(t *testing.T) {
+	cfg := Default()
+	cfg.CollapsedSkillGroups["group-a"] = true
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored AppConfig
+	if err := json.Unmarshal(data, &restored); err != nil {
+		t.Fatal(err)
+	}
+	if !restored.CollapsedSkillGroups["group-a"] {
+		t.Fatal("group lost")
+	}
+	older := `{"language":"system","theme":"system","library_dir":"/tmp/skills"}`
+	var legacy AppConfig
+	if err := json.Unmarshal([]byte(older), &legacy); err != nil {
+		t.Fatal(err)
+	}
+	if len(legacy.CollapsedSkillGroups) != 0 {
+		t.Fatal("must default empty")
+	}
+	// The BTreeSet serializes as a sorted array.
+	if !strings.Contains(string(data), `"collapsed_skill_groups":["group-a"]`) {
+		t.Fatalf("want array encoding: %s", data)
+	}
 }

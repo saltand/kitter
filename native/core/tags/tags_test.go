@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -181,5 +182,24 @@ func TestTagsJSONRoundTrip(t *testing.T) {
 	}
 	if got := raw.Skills.Assignments["demo"]; len(got) != 1 || got[0] != 2 {
 		t.Fatalf("assignments %v", got)
+	}
+}
+
+func TestTagStateNeverSerializesNullCollections(t *testing.T) {
+	state := &TagState{Assignments: map[string][]TagID{"s": nil}}
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := string(data)
+	if strings.Contains(raw, `"tags":null`) || strings.Contains(raw, `"assignments":null`) || strings.Contains(raw, `"s":null`) {
+		t.Fatalf("tag state contains null: %s", raw)
+	}
+	var decoded TagState
+	if err := json.Unmarshal([]byte(`{"next_id":0,"tags":null,"assignments":{"a":null}}`), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Tags == nil || decoded.Assignments["a"] == nil {
+		t.Fatal("nulls must normalize to empty")
 	}
 }
