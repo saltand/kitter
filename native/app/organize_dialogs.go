@@ -98,6 +98,28 @@ func (a *App) tagRow(c *ui.Context, scope TagScope, state *tags.TagState, tag *t
 	if child {
 		row.Margin(0, 0, 0, 26)
 	}
+	// Tag drag: reorder within the same parent level.
+	row.Drag(tagDrag{Scope: scope, Parent: tag.Parent, ID: tag.ID, Name: tag.Name})
+	if over, ok := ui.DragOver[tagDrag](row); ok {
+		bounds := row.Bounds()
+		_, py, _ := row.PointerPosition()
+		f.DropTarget = tagDropPoint(&over, scope, tag.Parent, tag.ID,
+			0, bounds.H, py)
+	}
+	if dropped, ok := ui.Drop[tagDrag](row); ok {
+		if f.DropTarget != nil && f.DropTarget.TagID == tag.ID {
+			a.applyTagDrop(&dropped, f.DropTarget)
+		}
+		f.DropTarget = nil
+	}
+	// Highlight the drop line (accent bar above/below the row).
+	if f.DropTarget != nil && f.DropTarget.TagID == tag.ID {
+		if f.DropTarget.Position == tagDropBefore {
+			row.Border(1, p.Accent).BorderWidth(1, 0, 0, 0)
+		} else {
+			row.Border(1, p.Accent).BorderWidth(0, 0, 1, 0)
+		}
+	}
 	row.Children(func() {
 		name := "#" + tag.Name
 		if child {
@@ -297,6 +319,27 @@ func (a *App) groupRow(c *ui.Context, id, name string) {
 	editing := f.Edit != nil && f.Edit.Kind == GroupEditRename && f.Edit.ID == id
 	row := ui.Row(c).Height(34).Padding(0, 8).AlignItems(ui.Center).Gap(6).
 		Radius(6).Key("group-row-" + id)
+	// Management-scope drag: reorder in the groups dialog.
+	row.Drag(groupDrag{Scope: GroupDragManagement, ID: id, Name: name})
+	if over, ok := ui.DragOver[groupDrag](row); ok {
+		bounds := row.Bounds()
+		_, py, _ := row.PointerPosition()
+		f.DropTarget = groupDropPoint(&over, GroupDragManagement, id,
+			0, bounds.H, py)
+	}
+	if dropped, ok := ui.Drop[groupDrag](row); ok {
+		if f.DropTarget != nil && f.DropTarget.ID == id {
+			a.applyGroupDrop(&dropped, f.DropTarget)
+		}
+		f.DropTarget = nil
+	}
+	if f.DropTarget != nil && f.DropTarget.ID == id && f.DropTarget.Scope == GroupDragManagement {
+		if f.DropTarget.Position == tagDropBefore {
+			row.Border(1, p.Accent).BorderWidth(1, 0, 0, 0)
+		} else {
+			row.Border(1, p.Accent).BorderWidth(0, 0, 1, 0)
+		}
+	}
 	row.Children(func() {
 		ui.Text(c, name).FontSize(13).Grow(1).SingleLine()
 		if ui.Icon(c, iconSVG("pencil.svg")).Size(22, 22).TextColor(p.Muted).

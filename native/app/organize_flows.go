@@ -70,6 +70,9 @@ type TagsFlow struct {
 	AssignmentKeys     []string
 	AssignmentLabel    string
 	ReturnToAssignment *TagAssignmentTarget
+	// DropTarget is ui::TagsFlowState.drop_target (the live drag
+	// highlight), nil when no drag is over a valid row.
+	DropTarget *tagDropTarget
 }
 
 // GroupsFlow is ui::GroupsFlowState.
@@ -83,6 +86,8 @@ type GroupsFlow struct {
 	DeleteSkills  bool
 	MoveSkills    []string
 	Error         string
+	// DropTarget is ui::GroupsFlowState.drop_target.
+	DropTarget *groupDropTarget
 }
 
 // tagsFor returns the TagState for the dialog's scope.

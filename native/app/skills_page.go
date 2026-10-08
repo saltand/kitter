@@ -261,23 +261,60 @@ func (a *App) groupHeaderRow(c *ui.Context, groups []model.SkillGroup, groupID s
 	if collapsed {
 		chevron = "chevron-right.svg"
 	}
-	header := ui.Row(c).Height(36).Padding(0, 8).Margin(3, 0, 0, 0).Radius(7).Gap(6).
-		AlignItems(ui.Center).TextColor(p.Secondary).Cursor(ui.CursorPointer).
-		Key("skill-group-" + groupID).
-		ContextMenu(func(m *ui.Menu) {
-			if m.Item(a.T("重命名", "Rename")).Chosen() {
-				a.startGroupEdit(GroupEdit{Kind: GroupEditRename, ID: groupID})
-				a.GroupsFlow.Open = true
-			}
-			if m.Item(a.T("删除分组", "Delete group")).Chosen() {
-				a.openGroupDeleteDialog(groupID)
-			}
+	// The outer wrapper owns group drops; the inner row owns skill
+	// drops. mygo's per-element accepts holds a single type check, so
+	// one element can not take both kinds — hitChain tries innermost
+	// first, which gives each kind its own target (Rust's row took
+	// both through separate on_drop handlers).
+	var header ui.Element
+	wrap := ui.Column(c).FillWidth()
+	wrap.Children(func() {
+		header = ui.Row(c).Height(36).Padding(0, 8).Margin(3, 0, 0, 0).Radius(7).Gap(6).
+			AlignItems(ui.Center).TextColor(p.Secondary).Cursor(ui.CursorPointer).
+			Key("skill-group-" + groupID).Label("skill-group-" + groupID).
+			Drag(groupDrag{Scope: GroupDragList, ID: groupID, Name: group.Name}).
+			ContextMenu(func(m *ui.Menu) {
+				if m.Item(a.T("重命名", "Rename")).Chosen() {
+					a.startGroupEdit(GroupEdit{Kind: GroupEditRename, ID: groupID})
+					a.GroupsFlow.Open = true
+				}
+				if m.Item(a.T("删除分组", "Delete group")).Chosen() {
+					a.openGroupDeleteDialog(groupID)
+				}
+			})
+		header.Children(func() {
+			ui.Icon(c, iconSVG(chevron)).TextColor(p.Muted)
+			ui.Text(c, group.Name).Font(FontMono).FontSize(13).SingleLine().Grow(1).MinWidth(0)
+			ui.Text(c, fmt.Sprint(count)).Font(FontMono).FontSize(12).TextColor(p.Muted)
 		})
-	header.Children(func() {
-		ui.Icon(c, iconSVG(chevron)).TextColor(p.Muted)
-		ui.Text(c, group.Name).Font(FontMono).FontSize(13).SingleLine().Grow(1).MinWidth(0)
-		ui.Text(c, fmt.Sprint(count)).Font(FontMono).FontSize(12).TextColor(p.Muted)
 	})
+	// Group drops register on the row's wrapper so the row's own
+	// accepts slot stays free for skill drops (one element takes one
+	// drag kind in mygo; hitChain walks ancestors until a kind takes).
+	// Group drops on the wrapper: DragOver stores the live target, the
+	// release frame's Drop consumes it (Rust's on_drag_move →
+	// drop_target → on_drop).
+	if over, ok := ui.DragOver[groupDrag](wrap); ok {
+		bounds := wrap.Bounds()
+		_, py, _ := wrap.PointerPosition()
+		a.GroupsFlow.DropTarget = groupDropPoint(&over, GroupDragList, groupID,
+			0, bounds.H, py)
+	}
+	if dropped, ok := ui.Drop[groupDrag](wrap); ok {
+		if a.GroupsFlow.DropTarget != nil && a.GroupsFlow.DropTarget.ID == groupID {
+			a.applyGroupDrop(&dropped, a.GroupsFlow.DropTarget)
+		}
+		a.GroupsFlow.DropTarget = nil
+	}
+	// Skill drops land on the inner row.
+	if _, ok := ui.DragOver[skillDrag](header); ok {
+		header.Background(p.Selected)
+	}
+	if dropped, ok := ui.Drop[skillDrag](header); ok {
+		gid := groupID
+		a.GroupsFlow.MoveSkills = []string{dropped.Name}
+		a.moveSelectedSkillToGroup(&gid)
+	}
 	if header.Clicked() {
 		if a.Skills.CollapsedGroups[groupID] {
 			delete(a.Skills.CollapsedGroups, groupID)
@@ -344,6 +381,9 @@ func (a *App) skillListRow(c *ui.Context, skill *model.SkillSummary, nested bool
 	row := ui.Row(c).MinHeight(44).Padding(6, 8).Gap(8).
 		AlignItems(ui.Center).Radius(8).Cursor(ui.CursorPointer).
 		Key("skill-" + storageName)
+	if !builtIn {
+		row.Drag(skillDrag{Name: storageName})
+	}
 	if nested {
 		row.Margin(2, 0, 2, 12)
 	} else {
