@@ -1,0 +1,7 @@
+{
+  "name": "Kitter",
+  "identifier": "dev.kitter.app",
+  "version": "0.1.7",
+  "icon": "resources/icon.png",
+  "out": "build"
+}
