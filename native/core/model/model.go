@@ -5,6 +5,7 @@ package model
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ type SkillOrigin struct {
 // produces byte-compatible output.
 
 type originJSON struct {
-	Type       string  `json:"type"`
+	Type       *string `json:"type"`
 	Repository *string `json:"repository,omitempty"`
 	Skill      *string `json:"skill,omitempty"`
 	SourceHash *string `json:"source_hash,omitempty"`
@@ -50,7 +51,7 @@ func strptr(s string) *string { return &s }
 
 // MarshalJSON implements the serde internal-tag shape for SkillOrigin.
 func (o SkillOrigin) MarshalJSON() ([]byte, error) {
-	j := originJSON{Type: o.Type}
+	j := originJSON{Type: strptr(o.Type)}
 	switch o.Type {
 	case "npx":
 		j.Repository = strptr(o.Repository)
@@ -81,7 +82,7 @@ func (o SkillOrigin) MarshalJSON() ([]byte, error) {
 func marshalOrdered(j originJSON) ([]byte, error) {
 	var b strings.Builder
 	b.WriteString(`{"type":`)
-	t, _ := json.Marshal(j.Type)
+	t, _ := json.Marshal(deref(j.Type))
 	b.Write(t)
 	write := func(name string, v *string, force bool) {
 		if v != nil {
@@ -93,7 +94,7 @@ func marshalOrdered(j originJSON) ([]byte, error) {
 		}
 	}
 	// serde preserves declaration order of the variant fields.
-	switch j.Type {
+	switch deref(j.Type) {
 	case "npx":
 		write("repository", j.Repository, false)
 		write("skill", j.Skill, false)
@@ -112,15 +113,25 @@ func marshalOrdered(j originJSON) ([]byte, error) {
 	return []byte(b.String()), nil
 }
 
-// UnmarshalJSON reads the serde internal-tag shape.
+// UnmarshalJSON reads the serde internal-tag shape. serde errors on an
+// internally tagged enum whose "type" key is missing and on an unknown
+// variant; #[default] only applies when the whole `origin` field is
+// absent, which SkillRecord handles.
 func (o *SkillOrigin) UnmarshalJSON(data []byte) error {
 	var j originJSON
 	if err := json.Unmarshal(data, &j); err != nil {
 		return err
 	}
-	o.Type = j.Type
-	if o.Type == "" {
-		o.Type = "unknown" // serde #[default] on the enum
+	if j.Type == nil {
+		// Missing tag: serde errors on internally tagged enums (and
+		// "origin":null unmarshals j.Type as nil too).
+		return errors.New("missing field `type`")
+	}
+	o.Type = *j.Type
+	switch o.Type {
+	case "builtin", "npx", "claude_marketplace", "git", "local", "unknown":
+	default:
+		return fmt.Errorf("unknown SkillOrigin variant %q", o.Type)
 	}
 	o.Repository = deref(j.Repository)
 	o.Skill = deref(j.Skill)
@@ -225,7 +236,7 @@ type SkillSource struct {
 }
 
 type sourceJSON struct {
-	Type       string  `json:"type"`
+	Type       *string `json:"type"`
 	Repository *string `json:"repository,omitempty"`
 	Plugin     *string `json:"plugin,omitempty"`
 	Subdir     *string `json:"subdir"`
@@ -270,9 +281,14 @@ func (s *SkillSource) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &j); err != nil {
 		return err
 	}
-	s.Type = j.Type
-	if s.Type == "" {
-		s.Type = "unknown"
+	if j.Type == nil {
+		return errors.New("missing field `type`")
+	}
+	s.Type = *j.Type
+	switch s.Type {
+	case "builtin", "npx", "claude_marketplace", "git", "local", "unknown":
+	default:
+		return fmt.Errorf("unknown SkillSource variant %q", s.Type)
 	}
 	s.Repository = deref(j.Repository)
 	s.Plugin = deref(j.Plugin)
@@ -440,6 +456,23 @@ const (
 	TargetCopilot     InstallTarget = "copilot"
 )
 
+// UnmarshalJSON rejects unknown variants, as serde does.
+func (t *InstallTarget) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch InstallTarget(s) {
+	case TargetUniversal, TargetCodex, TargetClaudeCode, TargetCursor,
+		TargetOpenCode, TargetPi, TargetGrok, TargetAntigravity,
+		TargetDroid, TargetCopilot:
+		*t = InstallTarget(s)
+		return nil
+	default:
+		return fmt.Errorf("unknown InstallTarget variant %q", s)
+	}
+}
+
 // ProjectSkill groups one skill's installations across targets.
 type ProjectSkill struct {
 	Name          string                     `json:"name"`
@@ -456,25 +489,115 @@ type ProjectSkillInstallation struct {
 // ReferenceKind is adoption::ReferenceKind, kept here so library can
 // persist adopted references without importing the adoption package.
 //
-// serde: #[serde(rename_all = "snake_case")] unit enum → plain string.
+// serde: NO serde attribute — the variant names serialize verbatim:
+// "Link", "Direct", "Alias", "Plugin".
 type ReferenceKind string
 
 const (
-	ReferenceLink   ReferenceKind = "link"
-	ReferenceDirect ReferenceKind = "direct"
-	ReferenceAlias  ReferenceKind = "alias"
-	ReferencePlugin ReferenceKind = "plugin"
+	ReferenceLink   ReferenceKind = "Link"
+	ReferenceDirect ReferenceKind = "Direct"
+	ReferenceAlias  ReferenceKind = "Alias"
+	ReferencePlugin ReferenceKind = "Plugin"
 )
+
+// UnmarshalJSON rejects unknown variants, as serde does for a plain
+// unit enum.
+func (k *ReferenceKind) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch ReferenceKind(s) {
+	case ReferenceLink, ReferenceDirect, ReferenceAlias, ReferencePlugin:
+		*k = ReferenceKind(s)
+		return nil
+	default:
+		return fmt.Errorf("unknown ReferenceKind variant %q", s)
+	}
+}
 
 // SkillReference is adoption::SkillReference: one observed installation
 // reference of an adopted skill, persisted in registry.adopted_sources.
 //
-// serde: path and source are PathBuf (plain strings); kind is a
-// snake_case unit variant; original_target is Option<PathBuf> with no
-// skip attribute → serializes as null when absent.
+// serde: path and source are PathBuf (plain strings); kind serializes
+// its variant name verbatim (no rename_all); original_target is
+// Option<PathBuf> with no skip attribute → serializes as null when
+// absent.
 type SkillReference struct {
 	Path           string        `json:"path"`
 	Source         string        `json:"source"`
 	Kind           ReferenceKind `json:"kind"`
 	OriginalTarget *string       `json:"original_target"`
+}
+
+// recordJSON is the serde shape of SkillRecord: every persisted field
+// except name has #[serde(default)] (storage_name also skips when
+// empty, group_id serializes only when Some... — see SkillRecord's
+// Rust annotations: name/storage_name/group_id are plain fields, the
+// rest default). description is serde(skip).
+type recordJSON struct {
+	Name            string          `json:"name"`
+	StorageName     string          `json:"storage_name"`
+	Origin          json.RawMessage `json:"origin"`
+	UpdateAvailable bool            `json:"update_available"`
+	GroupID         *string         `json:"group_id"`
+	LastOperatedAt  uint64          `json:"last_operated_at"`
+	KitterManual    bool            `json:"kitter_manual"`
+}
+
+// MarshalJSON keeps serde's field order: name, storage_name (skipped
+// when empty), origin, update_available, group_id, last_operated_at,
+// kitter_manual — description is never persisted.
+func (r SkillRecord) MarshalJSON() ([]byte, error) {
+	var b strings.Builder
+	b.WriteString(`{"name":`)
+	n, _ := json.Marshal(r.Name)
+	b.Write(n)
+	if r.StorageName != "" {
+		s, _ := json.Marshal(r.StorageName)
+		b.WriteString(`,"storage_name":`)
+		b.Write(s)
+	}
+	b.WriteString(`,"origin":`)
+	o, _ := r.Origin.MarshalJSON()
+	b.Write(o)
+	b.WriteString(`,"update_available":`)
+	u, _ := json.Marshal(r.UpdateAvailable)
+	b.Write(u)
+	if r.GroupID != nil {
+		g, _ := json.Marshal(*r.GroupID)
+		b.WriteString(`,"group_id":`)
+		b.Write(g)
+	}
+	b.WriteString(`,"last_operated_at":`)
+	l, _ := json.Marshal(r.LastOperatedAt)
+	b.Write(l)
+	b.WriteString(`,"kitter_manual":`)
+	k, _ := json.Marshal(r.KitterManual)
+	b.Write(k)
+	b.WriteByte('}')
+	return []byte(b.String()), nil
+}
+
+// UnmarshalJSON applies serde's defaults: a missing origin is
+// SkillOrigin::default() = Unknown; the other defaulted fields take
+// their zero values.
+func (r *SkillRecord) UnmarshalJSON(data []byte) error {
+	var j recordJSON
+	if err := json.Unmarshal(data, &j); err != nil {
+		return err
+	}
+	r.Name = j.Name
+	r.StorageName = j.StorageName
+	r.GroupID = j.GroupID
+	r.LastOperatedAt = j.LastOperatedAt
+	r.KitterManual = j.KitterManual
+	r.UpdateAvailable = j.UpdateAvailable
+	r.Origin = OriginUnknown()
+	if j.Origin != nil {
+		if err := json.Unmarshal(j.Origin, &r.Origin); err != nil {
+			return err
+		}
+	}
+	return nil
 }

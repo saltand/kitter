@@ -516,8 +516,8 @@ func TestRegistryNeverSerializesNullCollections(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw = string(data)
-	if !strings.Contains(raw, `"kind":"link"`) || !strings.Contains(raw, `"kind":"direct"`) {
-		t.Fatalf("kind not snake_case: %s", raw)
+	if !strings.Contains(raw, `"kind":"Link"`) || !strings.Contains(raw, `"kind":"Direct"`) {
+		t.Fatalf("kind not serde variant name: %s", raw)
 	}
 	if !strings.Contains(raw, `"original_target":"/tmp/source"`) || !strings.Contains(raw, `"original_target":null`) {
 		t.Fatalf("original_target shape wrong: %s", raw)

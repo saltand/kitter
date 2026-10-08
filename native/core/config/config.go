@@ -75,6 +75,36 @@ const (
 	ThemeDark   Theme = "dark"
 )
 
+// UnmarshalJSON rejects unknown variants, as serde does.
+func (t *Theme) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch Theme(s) {
+	case ThemeSystem, ThemeLight, ThemeDark:
+		*t = Theme(s)
+		return nil
+	default:
+		return fmt.Errorf("unknown Theme variant %q", s)
+	}
+}
+
+// UnmarshalJSON rejects unknown variants, as serde does.
+func (l *Language) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	switch Language(s) {
+	case LanguageSystem, LanguageZhCn, LanguageEn:
+		*l = Language(s)
+		return nil
+	default:
+		return fmt.Errorf("unknown Language variant %q", s)
+	}
+}
+
 // AppConfig mirrors config::AppConfig in config.json.
 //
 // serde note: recent_projects/project_activity are #[serde(default)],
