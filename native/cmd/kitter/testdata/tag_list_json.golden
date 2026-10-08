@@ -1,0 +1,14 @@
+[
+  {
+    "id": "id:<N>",
+    "name": "testing",
+    "parent": null,
+    "assignments": 1
+  },
+  {
+    "id": "id:<N>",
+    "name": "e2e",
+    "parent": "testing",
+    "assignments": 1
+  }
+]

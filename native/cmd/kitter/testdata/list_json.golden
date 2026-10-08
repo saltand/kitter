@@ -1,0 +1,32 @@
+[
+  {
+    "id": "id:_kitter-builtin",
+    "name": "kitter",
+    "description": "Use Kitter CLI to manage a reusable skill library, add or adopt skill sources, install them globally or per project, inspect effective skills, organize the library, and maintain updates. Applies Kitter's minimal-global, project-first best practice.",
+    "origin": {
+      "type": "builtin"
+    },
+    "path": "<DATA>/skills/_kitter-builtin",
+    "group": null,
+    "tags": [],
+    "installed_projects": 0,
+    "manual_only": true,
+    "update_available": false
+  },
+  {
+    "id": "id:demo-skill",
+    "name": "demo-skill",
+    "description": "Demo description",
+    "origin": {
+      "type": "local",
+      "path": "<DATA>/source/demo-skill",
+      "source_root": "<DATA>/source"
+    },
+    "path": "<DATA>/skills/demo-skill",
+    "group": null,
+    "tags": [],
+    "installed_projects": 0,
+    "manual_only": false,
+    "update_available": false
+  }
+]

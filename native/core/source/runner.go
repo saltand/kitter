@@ -1,9 +1,10 @@
 // runner.go abstracts external tool invocations (npx, git, claude) so
 // tests inject fakes and never touch the network. Rust's source.rs uses
 // std::process::Command directly and, for its npx fixture test, re-execs
-// the test binary via env::current_exe. The Go port replaces that with
-// an in-process fake Runner because the Kitter CLI does not exist until
-// M6 — there is no stable subcommand to re-exec.
+// the test binary via env::current_exe. The Go port keeps an in-process
+// fake Runner: the kitter CLI (cmd/kitter) exists but has no fixture
+// subcommand, and re-execing test binaries adds no coverage the fake
+// lacks.
 package source
 
 import (

@@ -5,6 +5,7 @@
 package effective
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -57,6 +58,138 @@ func (k AgentKind) ID() string {
 		return "hermes"
 	}
 	return ""
+}
+
+// MarshalJSON serializes AgentKind with serde's rename_all=snake_case
+// ("claude_code", not the CLI's claude-code ID).
+func (k AgentKind) MarshalJSON() ([]byte, error) {
+	return json.Marshal(k.snakeName())
+}
+
+func (k AgentKind) snakeName() string {
+	switch k {
+	case AgentCodex:
+		return "codex"
+	case AgentClaudeCode:
+		return "claude_code"
+	case AgentCursor:
+		return "cursor"
+	case AgentOpenCode:
+		return "open_code"
+	case AgentCopilot:
+		return "copilot"
+	case AgentAntigravity:
+		return "antigravity"
+	case AgentAmp:
+		return "amp"
+	case AgentDroid:
+		return "droid"
+	case AgentPi:
+		return "pi"
+	case AgentGrok:
+		return "grok"
+	case AgentOpenClaw:
+		return "open_claw"
+	case AgentHermes:
+		return "hermes"
+	}
+	return ""
+}
+
+// MarshalJSON serializes SkillScope with serde's rename_all=snake_case.
+func (s SkillScope) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.snakeName())
+}
+
+func (s SkillScope) snakeName() string {
+	switch s {
+	case ScopeLocal:
+		return "local"
+	case ScopeRepository:
+		return "repository"
+	case ScopeUser:
+		return "user"
+	case ScopeSystem:
+		return "system"
+	}
+	return ""
+}
+
+// MarshalJSON serializes SkillSource with serde's internally tagged
+// shape: {"type":"filesystem"} | {"type":"builtin"} |
+// {"type":"plugin","id":...,"display_name":...}.
+func (s SkillSource) MarshalJSON() ([]byte, error) {
+	switch s.Kind {
+	case SourceBuiltin:
+		return json.Marshal(map[string]string{"type": "builtin"})
+	case SourcePlugin:
+		return json.Marshal(struct {
+			Type        string `json:"type"`
+			ID          string `json:"id"`
+			DisplayName string `json:"display_name"`
+		}{Type: "plugin", ID: s.ID, DisplayName: s.DisplayName})
+	default:
+		return json.Marshal(map[string]string{"type": "filesystem"})
+	}
+}
+
+// MarshalJSON emits the serde field shape of EffectiveSkill: Option
+// fields become null when absent.
+func (s EffectiveSkill) MarshalJSON() ([]byte, error) {
+	type skillJSON struct {
+		ID          string          `json:"id"`
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		WhenToUse   *string         `json:"when_to_use"`
+		Path        string          `json:"path"`
+		RootPath    *string         `json:"root_path"`
+		PromptPath  *string         `json:"prompt_path"`
+		Scope       SkillScope      `json:"scope"`
+		Visibility  SkillVisibility `json:"visibility"`
+		Source      SkillSource     `json:"source"`
+	}
+	var whenToUse, rootPath, promptPath *string
+	if s.HasWhenToUse {
+		whenToUse = &s.WhenToUse
+	}
+	if s.RootPath != "" {
+		rootPath = &s.RootPath
+	}
+	if s.PromptPath != "" {
+		promptPath = &s.PromptPath
+	}
+	return json.Marshal(skillJSON{
+		ID: s.ID, Name: s.Name, Description: s.Description,
+		WhenToUse: whenToUse, Path: s.Path, RootPath: rootPath,
+		PromptPath: promptPath, Scope: s.Scope,
+		Visibility: s.Visibility, Source: s.Source,
+	})
+}
+
+// MarshalJSON emits the serde field order of AgentContextEstimate.
+func (e AgentContextEstimate) MarshalJSON() ([]byte, error) {
+	type estimateJSON struct {
+		Agent             AgentKind        `json:"agent"`
+		DiscoveredCount   int              `json:"discovered_count"`
+		ModelVisibleCount int              `json:"model_visible_count"`
+		ManualOnlyCount   int              `json:"manual_only_count"`
+		NameOnlyCount     int              `json:"name_only_count"`
+		ConditionalCount  int              `json:"conditional_count"`
+		EstimatedTokens   int              `json:"estimated_tokens"`
+		Skills            []EffectiveSkill `json:"skills"`
+	}
+	skills := e.Skills
+	if skills == nil {
+		skills = []EffectiveSkill{}
+	}
+	return json.Marshal(estimateJSON{
+		Agent: e.Agent, DiscoveredCount: e.DiscoveredCount,
+		ModelVisibleCount: e.ModelVisibleCount,
+		ManualOnlyCount:   e.ManualOnlyCount,
+		NameOnlyCount:     e.NameOnlyCount,
+		ConditionalCount:  e.ConditionalCount,
+		EstimatedTokens:   e.EstimatedTokens, Skills: skills,
+	})
 }
 
 // Label is AgentKind::label.
@@ -142,17 +275,17 @@ func (s SkillSource) PluginDisplayName() (string, bool) {
 
 // EffectiveSkill is effective_skills::EffectiveSkill.
 type EffectiveSkill struct {
-	ID          string
-	Name        string
-	Description string
-	WhenToUse   string  // "" == None
+	ID           string
+	Name         string
+	Description  string
+	WhenToUse    string // "" == None
 	HasWhenToUse bool
-	Path        string
-	RootPath    string // "" == None
-	PromptPath  string // "" == None
-	Scope       SkillScope
-	Visibility  SkillVisibility
-	Source      SkillSource
+	Path         string
+	RootPath     string // "" == None
+	PromptPath   string // "" == None
+	Scope        SkillScope
+	Visibility   SkillVisibility
+	Source       SkillSource
 }
 
 // IsPlugin is EffectiveSkill::is_plugin.

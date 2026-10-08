@@ -1,0 +1,16 @@
+{
+  "id": "id:demo-skill",
+  "name": "demo-skill",
+  "description": "Demo description",
+  "origin": {
+    "type": "local",
+    "path": "<DATA>/source/demo-skill",
+    "source_root": "<DATA>/source"
+  },
+  "path": "<DATA>/skills/demo-skill",
+  "group": null,
+  "tags": [],
+  "installed_projects": 0,
+  "manual_only": false,
+  "update_available": false
+}
