@@ -118,7 +118,7 @@ func (a *App) scanLocalFolder(path string) {
 	a.AddFlow.GroupEnabled = true
 	a.AddFlow.scanGen++
 	gen := a.AddFlow.scanGen
-	go func() {
+	a.spawn(func() {
 		scan, err := source.ScanLocal(path)
 		a.Apply(func() {
 			if a.AddFlow.scanGen != gen {
@@ -132,7 +132,7 @@ func (a *App) scanLocalFolder(path string) {
 			a.AddFlow.GroupName = scan.DefaultGroupName()
 			a.AddFlow.Scan = scan
 		})
-	}()
+	})
 }
 
 // scanAddSource is scan_add_source (Npx/Claude/Existing).
@@ -154,7 +154,7 @@ func (a *App) scanAddSource() {
 	a.AddFlow.GroupEnabled = true
 	a.AddFlow.scanGen++
 	gen := a.AddFlow.scanGen
-	go func() {
+	a.spawn(func() {
 		var scan *source.SkillScan
 		var err error
 		switch kind {
@@ -177,7 +177,7 @@ func (a *App) scanAddSource() {
 			a.AddFlow.GroupName = scan.DefaultGroupName()
 			a.AddFlow.Scan = scan
 		})
-	}()
+	})
 }
 
 // scanExistingSkills is scan_existing_skills.
@@ -207,7 +207,7 @@ func (a *App) scanExistingSkills() {
 	a.AddFlow.Task = &task
 	a.AddFlow.adoptionGen++
 	gen := a.AddFlow.adoptionGen
-	go func() {
+	a.spawn(func() {
 		scan, err := adoption.ScanRoots(ctx, home, roots, libraryDir, managed)
 		a.Apply(func() {
 			if a.AddFlow.adoptionGen != gen {
@@ -227,7 +227,7 @@ func (a *App) scanExistingSkills() {
 			a.AddFlow.AdoptionScan = scan
 			a.buildAdoptionRows()
 		})
-	}()
+	})
 }
 
 // browseAddLocal is browse_add_local.
@@ -235,7 +235,7 @@ func (a *App) browseAddLocal() {
 	if a.addBusy() {
 		return
 	}
-	go func() {
+	a.spawn(func() {
 		paths, err := PickDirectory(a.T("选择", "Choose"))
 		if err != nil || len(paths) == 0 {
 			return
@@ -244,7 +244,7 @@ func (a *App) browseAddLocal() {
 		a.Apply(func() {
 			a.scanLocalFolder(path)
 		})
-	}()
+	})
 }
 
 // browseAdoptionRoot is browse_adoption_root.
@@ -252,7 +252,7 @@ func (a *App) browseAdoptionRoot() {
 	if a.addBusy() {
 		return
 	}
-	go func() {
+	a.spawn(func() {
 		paths, err := PickDirectory(a.T("选择", "Choose"))
 		if err != nil || len(paths) == 0 {
 			return
@@ -264,7 +264,7 @@ func (a *App) browseAdoptionRoot() {
 			a.AddFlow.Selected = map[string]bool{}
 			a.AddFlow.adoptionRows = nil
 		})
-	}()
+	})
 }
 
 // importScannedSkills is import_scanned_skills (source scans). In
@@ -289,7 +289,7 @@ func (a *App) importScannedSkills() {
 	task := AddImporting
 	a.AddFlow.Task = &task
 	a.AddFlow.Error = ""
-	go func() {
+	a.spawn(func() {
 		// The scan snapshot is immutable; queue the library mutation for
 		// the UI thread.
 		a.Apply(func() {
@@ -313,7 +313,7 @@ func (a *App) importScannedSkills() {
 				a.notice(fmt.Sprintf("已添加 %d 个，跳过 %d 个已存在", summary.Added, summary.Skipped))
 			}
 		})
-	}()
+	})
 }
 
 // adoptSelectedSkills is adopt_selected_skills. lib is a fresh
@@ -331,7 +331,7 @@ func (a *App) adoptSelectedSkills() {
 	a.AddFlow.Task = &task
 	a.AddFlow.Error = ""
 	english := a.UsesEnglish()
-	go func() {
+	a.spawn(func() {
 		lib, err := library.OpenIn(dataDir)
 		if err != nil {
 			a.Apply(func() {
@@ -396,7 +396,7 @@ func (a *App) adoptSelectedSkills() {
 				a.AddFlow.Error = strings.Join(failures, "\n")
 			}
 		})
-	}()
+	})
 }
 
 func plural(n int) string {
