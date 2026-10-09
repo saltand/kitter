@@ -51,7 +51,7 @@ func (a *App) projectsPage(c *ui.Context) {
 		ui.Column(c).Width(300).Shrink(0).Border(1, p.Border).BorderWidth(0, 0, 0, 1).Children(func() {
 			ui.Row(c).Height(52).Shrink(0).Padding(0, 12).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, a.T("项目", "Projects")).FontSize(14).Bold().Grow(1)
-				if ui.Icon(c, iconSVG("folder.svg")).Size(28, 28).TextColor(p.Text).
+				if iconButton(c, "folder.svg", 28, 16).TextColor(p.Text).
 					Label(a.T("打开项目文件夹", "Open project folder")).
 					Tooltip(a.T("打开项目文件夹", "Open project folder")).
 					Cursor(ui.CursorPointer).Clicked() {
@@ -77,7 +77,7 @@ func (a *App) projectsPage(c *ui.Context) {
 				if a.Projects.SelectedProjectTagFilter != 0 {
 					iconColor = p.Accent
 				}
-				ui.Icon(c, iconSVG("hash.svg")).Size(28, 28).TextColor(iconColor).
+				iconButton(c, "hash.svg", 28, 16).TextColor(iconColor).
 					Label(a.T("筛选标签", "Filter by tag")).Tooltip(a.T("筛选标签", "Filter by tag")).
 					Menu(func(m *ui.Menu) { a.projectTagFilterMenu(m) })
 			})
@@ -344,7 +344,7 @@ func (a *App) contextEstimatePanel(c *ui.Context, path string, estimates []effec
 				icon = "chevron-up.svg"
 			}
 			ui.Row(c).Height(30).Justify(ui.Center).Children(func() {
-				if ui.Icon(c, iconSVG(icon)).Size(28, 28).TextColor(p.Muted).
+				if iconButton(c, icon, 28, 16).TextColor(p.Muted).
 					Tooltip(label).Label("toggle-project-agents").Cursor(ui.CursorPointer).Clicked() {
 					a.Projects.ProjectAgentsExpanded = !a.Projects.ProjectAgentsExpanded
 				}
@@ -352,7 +352,7 @@ func (a *App) contextEstimatePanel(c *ui.Context, path string, estimates []effec
 		}
 		// Refresh button (top-right).
 		ui.Row(c).Absolute().Top(7).Right(7).Children(func() {
-			if ui.Icon(c, iconSVG("rotate-cw.svg")).Size(28, 28).TextColor(p.Secondary).
+			if iconButton(c, "rotate-cw.svg", 28, 16).TextColor(p.Secondary).
 				Tooltip(a.T("刷新 token 扫描", "Refresh token scan")).
 				Label(a.T("刷新 token 扫描", "Refresh token scan")).
 				Key("refresh-context-" + path).Cursor(ui.CursorPointer).Clicked() {
@@ -492,7 +492,7 @@ func (a *App) effectiveSkillRow(c *ui.Context, projectPath string, global bool, 
 						ui.Text(c, displayEffectiveRoot(inst.Path, projectPath)).FontSize(11).Font(FontMono).
 							TextColor(p.Muted).Grow(1).SingleLine()
 						ui.Text(c, string(inst.Target)).FontSize(10).Font(FontMono).TextColor(p.Muted)
-						if ui.Icon(c, iconSVG("trash.svg")).Size(24, 24).TextColor(p.Danger).
+						if iconButton(c, "trash.svg", 24, 14).TextColor(p.Danger).
 							Background(p.DangerSoft).Radius(6).Cursor(ui.CursorPointer).
 							Label(a.T("移除", "Remove")).Tooltip(a.T("移除", "Remove")).
 							Key("remove-install-" + inst.Path).Clicked() {
@@ -531,7 +531,7 @@ func (a *App) effectiveAgentBadges(c *ui.Context, kinds []effective.AgentKind) {
 			shown = shown[:5]
 		}
 		for i, agent := range shown {
-			icon := ui.Icon(c, iconSVG(agent.IconPath)).Size(25, 25).
+			icon := iconButton(c, agent.IconPath, 25, 17).
 				TextColor(p.Text).Tooltip(agent.Name).Label(agent.Name)
 			if i > 0 {
 				icon.Margin(0, 0, 0, -5)

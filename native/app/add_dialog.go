@@ -22,7 +22,7 @@ func (a *App) addDialog(c *ui.Context) {
 			ui.Box(c).Padding(20).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, a.T("添加技能", "Add Skill")).FontSize(16).Bold().Grow(1)
-					if ui.Icon(c, iconSVG("x.svg")).Size(30, 30).TextColor(p.Text).
+					if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
 						Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 						Key("add-close").Clicked() {
 						a.closeAddModal()

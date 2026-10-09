@@ -127,7 +127,7 @@ func (a *App) installDialog(c *ui.Context) {
 			// Header.
 			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, a.T("安装技能", "Install Skill")).FontSize(16).Bold().Grow(1)
-				if ui.Icon(c, iconSVG("x.svg")).Size(30, 30).TextColor(p.Text).
+				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
 					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 					Key("install-close").Clicked() {
 					a.InstallFlow.Modal = false
@@ -211,7 +211,7 @@ func (a *App) installProjectRow(c *ui.Context, home string) {
 		}
 		ui.Text(c, label).FontSize(13).Font(FontMono).Grow(1).SingleLine().
 			TextColor(p.Text)
-		if ui.Icon(c, iconSVG("ellipsis.svg")).Size(20, 20).TextColor(p.Muted).
+		if iconButton(c, "ellipsis.svg", 20, 14).TextColor(p.Muted).
 			Cursor(ui.CursorPointer).Key("install-browse-project").Clicked() {
 			a.browseProject()
 		}

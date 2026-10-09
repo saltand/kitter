@@ -146,7 +146,7 @@ func (a *App) skillListPane(c *ui.Context, t *ui.Theme, rows []listEntry, groups
 				ui.Text(c, a.T("技能", "Skills")).FontSize(14).Bold().SingleLine()
 				ui.Text(c, fmt.Sprint(len(a.Skills.Items))).Font(FontMono).FontSize(12).TextColor(p.Muted)
 			})
-			if ui.Icon(c, iconSVG("plus.svg")).Size(28, 28).TextColor(p.Text).
+			if iconButton(c, "plus.svg", 28, 16).TextColor(p.Text).
 				Tooltip(a.T("添加技能", "Add Skill")).
 				Label(a.T("添加技能", "Add Skill")).
 				Cursor(ui.CursorPointer).Clicked() {
@@ -173,7 +173,7 @@ func (a *App) skillListPane(c *ui.Context, t *ui.Theme, rows []listEntry, groups
 			if a.HasTagFilter {
 				iconColor = p.Accent
 			}
-			ui.Icon(c, iconSVG("hash.svg")).Size(28, 28).TextColor(iconColor).
+			iconButton(c, "hash.svg", 28, 16).TextColor(iconColor).
 				Label(a.T("筛选标签", "Filter by tag")).Tooltip(a.T("筛选标签", "Filter by tag")).
 				Menu(func(m *ui.Menu) { a.tagFilterMenu(m) })
 		})
@@ -567,20 +567,20 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 				})
 				ui.Row(c).Gap(8).Children(func() {
 					if skill.Record.UpdateAvailable {
-						if ui.Icon(c, iconSVG("rotate-cw.svg")).Size(30, 30).TextColor(p.Secondary).
+						if iconButton(c, "rotate-cw.svg", 30, 16).TextColor(p.Secondary).
 							Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 							Label(a.T("更新", "Update")).Tooltip(a.T("更新", "Update")).
 							Key("update-skill").Clicked() {
 							a.updateSkill(storageName)
 						}
 					}
-					if ui.Icon(c, iconSVG("trash.svg")).Size(30, 30).TextColor(p.Danger).
+					if iconButton(c, "trash.svg", 30, 16).TextColor(p.Danger).
 						Background(p.DangerSoft).Radius(8).Cursor(ui.CursorPointer).
 						Label(a.T("删除技能", "Delete Skill")).Tooltip(a.T("删除技能", "Delete Skill")).
 						Key("delete-skill").Clicked() {
 						a.openLibraryDelete([]model.SkillSummary{*skill})
 					}
-					if ui.Icon(c, iconSVG("download.svg")).Size(30, 30).TextColor(p.Secondary).
+					if iconButton(c, "download.svg", 30, 16).TextColor(p.Secondary).
 						Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 						Label(a.T("安装技能", "Install Skill")).Tooltip(a.T("安装技能", "Install Skill")).Clicked() {
 						a.openInstallDialog()
@@ -757,7 +757,7 @@ func (a *App) installsTab(c *ui.Context, skill *model.SkillSummary) {
 						TextColor(p.Muted).Selectable().SingleLine()
 				})
 				a.agentBadges(c, targets, false)
-				if ui.Icon(c, iconSVG("trash.svg")).Size(30, 30).TextColor(p.Danger).
+				if iconButton(c, "trash.svg", 30, 16).TextColor(p.Danger).
 					Background(p.DangerSoft).Radius(8).Margin(0, 0, 0, 10).Cursor(ui.CursorPointer).
 					Label(a.T("移除", "Remove")).Tooltip(a.T("移除", "Remove")).
 					Key("remove-install-" + projectPath).Clicked() {
@@ -984,7 +984,7 @@ func (a *App) deleteModal(c *ui.Context) {
 			ui.Box(c).Padding(20).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, a.deleteTitle()).FontSize(16).Bold().Grow(1).MinWidth(0)
-					if ui.Icon(c, iconSVG("x.svg")).Size(30, 30).TextColor(p.Text).
+					if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
 						Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 						Key("close-delete-modal").Clicked() {
 						a.Skills.DeleteOpen = false

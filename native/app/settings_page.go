@@ -150,7 +150,7 @@ func (a *App) libraryDirControl(c *ui.Context) {
 	ui.Row(c).Width(320).AlignItems(ui.Center).Gap(7).Children(func() {
 		ui.Text(c, displayPath(a.Library.Config.LibraryDir)).Font(FontMono).FontSize(12).
 			TextColor(p.Secondary).Grow(1).SingleLine().Selectable()
-		if ui.Icon(c, iconSVG("folder.svg")).Size(30, 30).TextColor(p.Text).
+		if iconButton(c, "folder.svg", 30, 16).TextColor(p.Text).
 			Background(p.Raised).Radius(7).Cursor(ui.CursorPointer).
 			Label(a.T("选择", "Choose")).Tooltip(a.T("选择", "Choose")).
 			Key("browse-library").Clicked() {

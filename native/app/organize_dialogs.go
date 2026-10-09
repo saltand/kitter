@@ -29,7 +29,7 @@ func (a *App) tagsDialog(c *ui.Context) {
 			// Header.
 			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, title).FontSize(16).Bold().Grow(1)
-				if ui.Icon(c, iconSVG("x.svg")).Size(30, 30).TextColor(p.Text).
+				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
 					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 					Key("close-tags-modal").Clicked() {
 					f.Open = false
@@ -131,20 +131,20 @@ func (a *App) tagRow(c *ui.Context, scope TagScope, state *tags.TagState, tag *t
 		}
 		// Add-child button (roots only, Rust allows one level).
 		if !child {
-			if ui.Icon(c, iconSVG("plus.svg")).Size(22, 22).TextColor(p.Muted).
+			if iconButton(c, "plus.svg", 22, 13).TextColor(p.Muted).
 				Radius(5).Cursor(ui.CursorPointer).
 				Tooltip(a.T("新建子标签", "New child tag")).Label(a.T("新建子标签", "New child tag")).
 				Key(fmt.Sprintf("tag-add-child-%d", tag.ID)).Clicked() {
 				a.startTagEdit(TagEdit{Kind: TagEditCreateChild, ID: tag.ID})
 			}
 		}
-		if ui.Icon(c, iconSVG("pencil.svg")).Size(22, 22).TextColor(p.Muted).
+		if iconButton(c, "pencil.svg", 22, 13).TextColor(p.Muted).
 			Radius(5).Cursor(ui.CursorPointer).
 			Tooltip(a.T("重命名", "Rename")).Label(a.T("重命名", "Rename")).
 			Key(fmt.Sprintf("tag-rename-%d", tag.ID)).Clicked() {
 			a.startTagEdit(TagEdit{Kind: TagEditRename, ID: tag.ID})
 		}
-		if ui.Icon(c, iconSVG("trash.svg")).Size(22, 22).TextColor(p.Danger).
+		if iconButton(c, "trash.svg", 22, 13).TextColor(p.Danger).
 			Radius(5).Cursor(ui.CursorPointer).
 			Tooltip(a.T("删除", "Delete")).Label(a.T("删除", "Delete")).
 			Key(fmt.Sprintf("tag-delete-%d", tag.ID)).Clicked() {
@@ -168,11 +168,11 @@ func (a *App) tagEditRow(c *ui.Context) {
 		Border(1, p.Accent).Margin(4, 0, 4, 0).Children(func() {
 		ui.TextInput(c, &f.NameInput).Grow(1).FontSize(13).
 			Label(a.T("标签名", "Tag name"))
-		if ui.Icon(c, iconSVG("check.svg")).Size(22, 22).TextColor(p.Accent).
+		if iconButton(c, "check.svg", 22, 13).TextColor(p.Accent).
 			Cursor(ui.CursorPointer).Key("tag-edit-confirm").Clicked() {
 			a.commitTagEdit()
 		}
-		if ui.Icon(c, iconSVG("x.svg")).Size(22, 22).TextColor(p.Muted).
+		if iconButton(c, "x.svg", 22, 13).TextColor(p.Muted).
 			Cursor(ui.CursorPointer).Key("tag-edit-cancel").Clicked() {
 			f.Edit = nil
 			f.Error = ""
@@ -202,7 +202,7 @@ func (a *App) assignTagsDialog(c *ui.Context) {
 					ui.Text(c, label).FontSize(12).Font(FontMono).TextColor(p.Muted).
 						SingleLine().Margin(3, 0, 0, 0)
 				})
-				if ui.Icon(c, iconSVG("x.svg")).Size(30, 30).TextColor(p.Text).
+				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
 					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 					Key("close-tag-assignment").Clicked() {
 					f.AssignOpen = false
@@ -278,7 +278,7 @@ func (a *App) groupsDialog(c *ui.Context) {
 		ui.Column(c).Width(360).Background(p.Elevated).Radius(12).Clip().Children(func() {
 			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, a.T("分组", "Groups")).FontSize(16).Bold().Grow(1)
-				if ui.Icon(c, iconSVG("x.svg")).Size(30, 30).TextColor(p.Text).
+				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
 					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
 					Key("close-groups-modal").Clicked() {
 					f.Open = false
@@ -342,13 +342,13 @@ func (a *App) groupRow(c *ui.Context, id, name string) {
 	}
 	row.Children(func() {
 		ui.Text(c, name).FontSize(13).Grow(1).SingleLine()
-		if ui.Icon(c, iconSVG("pencil.svg")).Size(22, 22).TextColor(p.Muted).
+		if iconButton(c, "pencil.svg", 22, 13).TextColor(p.Muted).
 			Radius(5).Cursor(ui.CursorPointer).
 			Tooltip(a.T("重命名", "Rename")).Label(a.T("重命名", "Rename")).
 			Key("group-rename-" + id).Clicked() {
 			a.startGroupEdit(GroupEdit{Kind: GroupEditRename, ID: id})
 		}
-		if ui.Icon(c, iconSVG("trash.svg")).Size(22, 22).TextColor(p.Danger).
+		if iconButton(c, "trash.svg", 22, 13).TextColor(p.Danger).
 			Radius(5).Cursor(ui.CursorPointer).
 			Tooltip(a.T("删除分组", "Delete group")).Label(a.T("删除分组", "Delete group")).
 			Key("group-delete-" + id).Clicked() {
@@ -368,11 +368,11 @@ func (a *App) groupEditRow(c *ui.Context) {
 		Border(1, p.Accent).Margin(4, 0, 4, 0).Children(func() {
 		ui.TextInput(c, &f.NameInput).Grow(1).FontSize(13).
 			Label(a.T("分组名", "Group name"))
-		if ui.Icon(c, iconSVG("check.svg")).Size(22, 22).TextColor(p.Accent).
+		if iconButton(c, "check.svg", 22, 13).TextColor(p.Accent).
 			Cursor(ui.CursorPointer).Key("group-edit-confirm").Clicked() {
 			a.commitGroupEdit()
 		}
-		if ui.Icon(c, iconSVG("x.svg")).Size(22, 22).TextColor(p.Muted).
+		if iconButton(c, "x.svg", 22, 13).TextColor(p.Muted).
 			Cursor(ui.CursorPointer).Key("group-edit-cancel").Clicked() {
 			f.Edit = nil
 			f.Error = ""
