@@ -11,9 +11,9 @@ import (
 	"github.com/saltand/kitter/native/core/effective"
 )
 
-// builtin holds the embedded copy of resources/skills/kitter, kept in sync
-// with the repository root by scripts/sync_builtin.sh and guarded by
-// builtin_sync_test.go.
+// builtin/kitter is the canonical source of the built-in Kitter skill
+// (formerly synced from resources/skills/kitter at the repository
+// root).
 //
 //go:embed builtin/kitter
 var builtinFS embed.FS
