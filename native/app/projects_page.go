@@ -46,10 +46,11 @@ func (a *App) projectsPage(c *ui.Context) {
 	roots = append(roots, projects...)
 	a.requestProjectSnapshots(c, roots)
 
-	ui.Row(c).Fill().MinWidth(0).Children(func() {
+	ui.Row(c).Fill().MinWidth(0).AlignItems(ui.Stretch).Children(func() {
 		// Sidebar.
-		ui.Column(c).Width(300).Shrink(0).Border(1, p.Border).BorderWidth(0, 0, 0, 1).Children(func() {
-			ui.Row(c).Height(52).Shrink(0).Padding(0, 12).AlignItems(ui.Center).Children(func() {
+		ui.Column(c).Width(300).Shrink(0).Background(p.Surface).
+			BorderWidth(0, 1, 0, 0).BorderColor(p.Border).Children(func() {
+			ui.Row(c).Height(52).Shrink(0).Padding(0, 12).AlignItems(ui.Center).DragWindow().Children(func() {
 				ui.Text(c, a.T("项目", "Projects")).FontSize(14).Bold().Grow(1)
 				if iconButton(c, "folder.svg", 28, 16).TextColor(p.Text).
 					Label(a.T("打开项目文件夹", "Open project folder")).
@@ -60,8 +61,12 @@ func (a *App) projectsPage(c *ui.Context) {
 			})
 			ui.Divider(c)
 			ui.Box(c).Padding(8, 10).Children(func() {
-				ui.SearchField(c, &a.Projects.Search).FillWidth().Label(a.T("搜索项目", "Search projects"))
+				a.searchField(c, &a.Projects.Search).Label(a.T("搜索项目", "Search projects"))
 			})
+
+			if home != "" {
+				a.globalProjectRow(c, home)
+			}
 
 			// Filter line: 全部 N + tag filter button.
 			ui.Row(c).Padding(0, 16, 6, 16).AlignItems(ui.Center).Children(func() {
@@ -83,9 +88,6 @@ func (a *App) projectsPage(c *ui.Context) {
 			})
 
 			ui.Scroll(c).Grow(1).MinHeight(0).Padding(0, 8).Children(func() {
-				if home != "" {
-					a.globalProjectRow(c, home)
-				}
 				if len(projects) == 0 {
 					ui.Text(c, a.emptyProjectsText()).FontSize(13).TextColor(p.Muted).
 						Padding(30, 16, 0, 16)
@@ -119,63 +121,59 @@ func (a *App) emptyProjectsText() string {
 	return a.T("没有匹配的项目", "No matching projects")
 }
 
-// globalProjectRow is the Global sidebar row.
+// globalProjectRow is global-project-skills: a 52-point row with the
+// house icon and the user-level skill count.
 func (a *App) globalProjectRow(c *ui.Context, home string) {
-	p := a.Palette()
-	selected := a.Projects.GlobalProjectView
 	skillCount := len(a.projectSnapshot(c, home))
-	row := ui.Column(c).Padding(12, 10).Radius(10).Margin(0, 0, 4, 0).
-		Cursor(ui.CursorPointer).Key("project-global").Children(func() {
-		ui.Row(c).AlignItems(ui.Center).Gap(10).Children(func() {
-			ui.Icon(c, iconSVG("globe.svg")).TextColor(p.Secondary)
-			ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-				ui.Text(c, a.T("全局", "Global")).FontSize(14).Bold().SingleLine()
-				ui.Text(c, displayPath(home)).FontSize(12).Font(FontMono).TextColor(p.Muted).SingleLine()
-			})
-		})
-		var line string
-		if a.UsesEnglish() {
-			line = fmt.Sprintf("%s available across all projects", Counted(skillCount, "global skill", "global skills"))
-		} else {
-			line = fmt.Sprintf("%d 个全局技能可用于所有项目", skillCount)
-		}
-		ui.Text(c, line).FontSize(11).TextColor(p.Muted).Margin(6, 0, 0, 0)
-	})
-	if selected {
-		row.Background(p.Selected)
+	var line string
+	if a.UsesEnglish() {
+		line = Counted(skillCount, "user-level skill", "user-level skills")
+	} else {
+		line = fmt.Sprintf("%d 个用户级技能", skillCount)
 	}
-	row.OnClick(func() {
+	row := a.projectListRow(c, "house.svg", a.T("全局生效", "Global"), line, "", a.Projects.GlobalProjectView, func() {})
+	row.MinHeight(52).Margin(0, 8, 6, 8).Key("project-global").OnClick(func() {
 		a.selectGlobalProject()
 	})
 }
 
 // projectRow is a sidebar project row.
 func (a *App) projectRow(c *ui.Context, path string) {
-	p := a.Palette()
 	selected := !a.Projects.GlobalProjectView && a.Projects.OpenProject == path
-	skillCount := len(a.projectSnapshot(c, path))
-	name := filepath.Base(path)
-	row := ui.Column(c).Padding(12, 10).Radius(10).Margin(0, 0, 4, 0).
-		Cursor(ui.CursorPointer).Key("project-" + path).Children(func() {
-		ui.Row(c).AlignItems(ui.Center).Gap(10).Children(func() {
-			ui.Icon(c, iconSVG("folder.svg")).TextColor(p.Secondary)
-			ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-				ui.Text(c, name).FontSize(14).Bold().SingleLine()
-				ui.Text(c, displayPath(path)).FontSize(12).Font(FontMono).TextColor(p.Muted).SingleLine()
-			})
-			ui.Text(c, fmt.Sprint(skillCount)).Font(FontMono).FontSize(12).TextColor(p.Muted)
-		})
+	count := fmt.Sprint(len(a.projectSnapshot(c, path)))
+	row := a.projectListRow(c, "folder.svg", filepath.Base(path), displayPath(path), count, selected, func() {
 		a.projectTagChips(c, path)
 	})
-	if selected {
-		row.Background(p.Selected)
-	}
-	row.OnClick(func() {
+	row.MinHeight(48).Margin(2, 0).Key("project-" + path).OnClick(func() {
 		a.selectProject(path)
 	})
 	row.Menu(func(m *ui.Menu) {
 		a.projectContextMenu(m, path)
 	})
+}
+
+// projectListRow is the shared project row shape: a 28-point icon box,
+// then a mono name over a mono detail line, and an optional count.
+func (a *App) projectListRow(c *ui.Context, icon, name, detail, count string, selected bool, extra func()) ui.Element {
+	p := a.Palette()
+	row := ui.Row(c).Padding(0, 8).Radius(RadiusControl).AlignItems(ui.Center).
+		Cursor(ui.CursorPointer).Children(func() {
+		ui.Box(c).Size(28, 28).Center().Shrink(0).Children(func() {
+			ui.Icon(c, iconSVG(icon)).Size(16, 16).TextColor(p.Secondary)
+		})
+		ui.Column(c).Grow(1).MinWidth(0).Margin(0, 0, 0, 10).Padding(6, 0).Children(func() {
+			ui.Text(c, name).Font(FontMono).FontSize(13).FontWeight(500).SingleLine()
+			ui.Text(c, detail).Font(FontMono).FontSize(11).TextColor(p.Muted).Margin(3, 0, 0, 0).SingleLine()
+			extra()
+		})
+		if count != "" {
+			ui.Text(c, count).Font(FontMono).FontSize(12).TextColor(p.Muted).Margin(0, 0, 0, 8).Shrink(0)
+		}
+	})
+	if selected {
+		row.Background(p.Selected)
+	}
+	return row
 }
 
 // projectTagChips renders the assigned-tag chips on a project row.
@@ -327,9 +325,9 @@ func (a *App) contextEstimatePanel(c *ui.Context, path string, estimates []effec
 	if canExpand && !a.Projects.ProjectAgentsExpanded {
 		shown = shown[:8]
 	}
-	ui.Box(c).Margin(8, 8, 0, 8).Border(1, p.Border).Radius(10).Clip().
+	ui.Box(c).Margin(8, 8, 0, 8).Border(1, p.Border).Radius(RadiusCard).Clip().Shrink(0).
 		Background(p.Surface).Children(func() {
-		ui.Row(c).Wrap().Padding(8, 8, 8, 42).Children(func() {
+		ui.Row(c).Wrap().Padding(8, 42, 0, 8).AlignItems(ui.Start).Children(func() {
 			for _, est := range shown {
 				est := est
 				a.estimateCard(c, est, tokenWarning, tokenDanger, countWarning, countDanger)
@@ -343,8 +341,8 @@ func (a *App) contextEstimatePanel(c *ui.Context, path string, estimates []effec
 				label = a.T("收起", "Show less")
 				icon = "chevron-up.svg"
 			}
-			ui.Row(c).Height(30).Justify(ui.Center).Children(func() {
-				if iconButton(c, icon, 28, 16).TextColor(p.Muted).
+			ui.Row(c).Height(44).Justify(ui.Center).Children(func() {
+				if iconButton(c, icon, 28, 13).Radius(14).Margin(5, 0, 0, 0).TextColor(p.Muted).
 					Tooltip(label).Label("toggle-project-agents").Cursor(ui.CursorPointer).Clicked() {
 					a.Projects.ProjectAgentsExpanded = !a.Projects.ProjectAgentsExpanded
 				}
@@ -376,19 +374,18 @@ func (a *App) estimateCard(c *ui.Context, est effective.AgentContextEstimate, to
 	} else if est.EstimatedTokens > tokenWarning || automatic > countWarning {
 		severity = p.Warning
 	}
-	var icon *ui.SVG
+	iconPath := "package.svg"
 	for _, agent := range agents.AgentIconOrder {
 		if agent.ID == est.Agent.ID() {
-			icon = iconSVG(agent.IconPath)
+			iconPath = agent.IconPath
 		}
-	}
-	if icon == nil {
-		icon = iconSVG("package.svg")
 	}
 	card := ui.Column(c).Width(176).Height(90).Padding(10, 12).Radius(12).
 		Cursor(ui.CursorPointer).Shrink(0).Children(func() {
 		ui.Row(c).AlignItems(ui.Center).Gap(6).Children(func() {
-			ui.Icon(c, icon).TextColor(p.Text).Shrink(0)
+			ui.Box(c).Size(24, 24).Center().Shrink(0).Children(func() {
+				brandIcon(c, iconPath, 18).TextColor(p.Text)
+			})
 			ui.Text(c, est.Agent.Label()).FontSize(11).TextColor(p.Secondary).SingleLine()
 		})
 		ui.Text(c, fmt.Sprintf("≈ %d tokens", est.EstimatedTokens)).Font(FontMono).
@@ -454,61 +451,71 @@ func (a *App) effectiveSkillsList(c *ui.Context, path string, global bool, rows 
 	})
 }
 
-// effectiveSkillRow is one effective_skills row.
+// effectiveSkillRow is project_skill_row: a 60px row with the name and
+// badges over a " · "-joined locations line, then agent badges and a
+// remove button when Kitter can delete the skill.
 func (a *App) effectiveSkillRow(c *ui.Context, projectPath string, global bool, row EffectiveSkillRow) {
 	p := a.Palette()
-	ui.Column(c).Padding(12, 4).Border(1, p.Border).BorderWidth(0, 0, 1, 0).Children(func() {
-		ui.Row(c).AlignItems(ui.Start).Gap(10).Children(func() {
-			ui.Icon(c, iconSVG("package.svg")).TextColor(p.Secondary).Margin(2, 0, 0, 0).Shrink(0)
-			ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-				ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
-					ui.Text(c, row.Name).Font(FontMono).FontSize(13).Bold().Selectable().Shrink(0)
-					if row.BuiltIn {
-						ui.Text(c, a.T("内置", "Built-in")).FontSize(10).Padding(1, 5).Radius(5).
-							Background(p.Raised).TextColor(p.Muted).Shrink(0)
-					}
-					if row.ManualOnly {
-						ui.Text(c, a.T("手动", "Manual")).FontSize(10).Padding(1, 5).Radius(5).
-							Background(p.Raised).TextColor(p.Warning).Shrink(0)
-					}
-					if global {
-						ui.Text(c, a.T("用户级", "User-level")).FontSize(10).Padding(1, 5).Radius(5).
-							Background(p.Raised).TextColor(p.Muted).Shrink(0)
-					}
-				})
+	managed := false
+	for _, inst := range row.DirectInstallations {
+		managed = managed || inst.Managed
+	}
+	var labels []string
+	for _, loc := range row.Locations {
+		labels = append(labels, displayEffectiveRoot(loc, projectPath))
+	}
+	if row.BuiltIn {
+		labels = append(labels, a.T("内置", "Built-in"))
+	}
+	ui.Row(c).Height(60).Padding(0, 4).AlignItems(ui.Center).Shrink(0).
+		BorderWidth(0, 0, 1, 0).BorderColor(p.Border).Key("project-skill-" + row.Name).Children(func() {
+		ui.Icon(c, iconSVG("package.svg")).Size(15, 15).TextColor(p.Secondary).Shrink(0)
+		ui.Column(c).Grow(1).MinWidth(0).Margin(0, 0, 0, 10).Children(func() {
+			ui.Row(c).AlignItems(ui.Center).MinWidth(0).Children(func() {
+				name := ui.Text(c, row.Name).Font(FontMono).FontSize(13).SingleLine().MinWidth(0).Selectable()
 				if row.Description != "" {
-					ui.Text(c, row.Description).FontSize(12).TextColor(p.Secondary).Margin(4, 0, 0, 0).Wrap()
+					name.Tooltip(row.Description)
 				}
-				// Locations.
-				for _, loc := range row.Locations {
-					ui.Text(c, displayEffectiveRoot(loc, projectPath)).FontSize(11).Font(FontMono).
-						TextColor(p.Muted).Margin(3, 0, 0, 0).SingleLine()
+				if row.ManualOnly {
+					a.skillBadge(c, "hand.svg", a.T("手动", "Manual"), p.Muted).Margin(0, 0, 0, 10)
 				}
-				// Installations.
-				for _, inst := range row.DirectInstallations {
-					inst := inst
-					ui.Row(c).AlignItems(ui.Center).Gap(8).Margin(6, 0, 0, 0).Children(func() {
-						ui.Icon(c, iconSVG("folder.svg")).TextColor(p.Muted).Shrink(0)
-						ui.Text(c, displayEffectiveRoot(inst.Path, projectPath)).FontSize(11).Font(FontMono).
-							TextColor(p.Muted).Grow(1).SingleLine()
-						ui.Text(c, string(inst.Target)).FontSize(10).Font(FontMono).TextColor(p.Muted)
-						if iconButton(c, "trash.svg", 24, 14).TextColor(p.Danger).
-							Background(p.DangerSoft).Radius(6).Cursor(ui.CursorPointer).
-							Label(a.T("移除", "Remove")).Tooltip(a.T("移除", "Remove")).
-							Key("remove-install-" + inst.Path).Clicked() {
-							skill := model.ProjectSkill{Name: row.Name, Installations: row.DirectInstallations}
-							a.openProjectDelete(projectPath, skill)
-						}
-					})
+				if managed {
+					a.skillBadge(c, "crown.svg", a.T("托管", "Managed"), p.Warning).Margin(0, 0, 0, 8)
+				}
+				if global {
+					a.skillBadge(c, "", a.T("用户级", "User-level"), p.Muted).Margin(0, 0, 0, 8)
 				}
 			})
-			a.effectiveAgentBadges(c, row.Agents)
+			ui.Text(c, strings.Join(labels, " · ")).Font(FontMono).FontSize(12).TextColor(p.Muted).
+				Margin(3, 0, 0, 0).SingleLine().MinWidth(0)
 		})
+		ui.Box(c).Margin(0, 0, 0, 12).Shrink(0).Children(func() { a.effectiveAgentBadges(c, row.Agents) })
+		if len(row.DirectInstallations) > 0 {
+			if iconButton(c, "trash.svg", ControlHeight, 16).TextColor(p.Danger).
+				Background(p.DangerSoft).Radius(RadiusControl).Cursor(ui.CursorPointer).Margin(0, 0, 0, 10).
+				Label(a.T("移除", "Remove")).Tooltip(a.T("移除", "Remove")).
+				Key("remove-project-" + row.Name).Clicked() {
+				skill := model.ProjectSkill{Name: row.Name, Installations: row.DirectInstallations}
+				a.openProjectDelete(projectPath, skill)
+			}
+		}
 	})
 }
 
-// effectiveAgentBadges is effective_agent_badges (agent icons on a
-// skills row).
+// skillBadge is manual_skill_badge / managed_skill_badge: a 20px pill
+// with an optional 11px glyph.
+func (a *App) skillBadge(c *ui.Context, icon, label string, color ui.Color) ui.Element {
+	p := a.Palette()
+	return ui.Row(c).Height(20).Padding(0, 7).Radius(7.5).Background(p.Raised).Gap(4).
+		AlignItems(ui.Center).Shrink(0).FontSize(11).TextColor(color).Children(func() {
+		if icon != "" {
+			ui.Icon(c, iconSVG(icon)).Size(11, 11)
+		}
+		ui.Text(c, label).SingleLine()
+	})
+}
+
+// effectiveAgentBadges is effective_agent_badges.
 func (a *App) effectiveAgentBadges(c *ui.Context, kinds []effective.AgentKind) {
 	var icons []agents.AgentIconInfo
 	for _, agent := range agents.AgentIconOrder {
@@ -519,30 +526,7 @@ func (a *App) effectiveAgentBadges(c *ui.Context, kinds []effective.AgentKind) {
 			}
 		}
 	}
-	if len(icons) == 0 {
-		return
-	}
-	p := a.Palette()
-	ui.Row(c).Shrink(0).AlignItems(ui.Center).Children(func() {
-		hidden := 0
-		shown := icons
-		if len(shown) > 5 {
-			hidden = len(shown) - 5
-			shown = shown[:5]
-		}
-		for i, agent := range shown {
-			icon := iconButton(c, agent.IconPath, 25, 17).
-				TextColor(p.Text).Tooltip(agent.Name).Label(agent.Name)
-			if i > 0 {
-				icon.Margin(0, 0, 0, -5)
-			}
-		}
-		if hidden > 0 {
-			ui.Text(c, fmt.Sprintf("+%d", hidden)).Font(FontMono).FontSize(9).
-				TextColor(p.Muted).Margin(0, 0, 0, -5).
-				Label(fmt.Sprintf("+%d agents", hidden))
-		}
-	})
+	a.renderAgentBadges(c, icons)
 }
 
 // effectivePluginsList is effective_plugins_list.

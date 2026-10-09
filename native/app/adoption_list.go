@@ -108,7 +108,7 @@ func (a *App) adoptionRow(c *ui.Context, pos int) ui.Element {
 		return ui.Row(c).Height(32).AlignItems(ui.Center).Padding(4, 8).
 			Children(func() {
 				ui.Text(c, chevron(expanded)).FontSize(12).TextColor(p.Secondary)
-				ui.Spacer(c).Width(6)
+				ui.Box(c).Width(6).Shrink(0)
 				ui.Text(c, label).FontSize(12).TextColor(p.Secondary)
 			})
 
@@ -140,14 +140,14 @@ func (a *App) adoptionRow(c *ui.Context, pos int) ui.Element {
 		row := ui.Row(c).Height(32).AlignItems(ui.Center).Padding(4, 8).
 			Children(func() {
 				ui.Text(c, check).FontSize(13)
-				ui.Spacer(c).Width(6)
+				ui.Box(c).Width(6).Shrink(0)
 				ui.Text(c, candidate.Name).FontSize(13).Grow(1).MinWidth(0).SingleLine()
 				if badges != "" {
 					ui.Text(c, badges).FontSize(11).TextColor(p.Secondary)
-					ui.Spacer(c).Width(6)
+					ui.Box(c).Width(6).Shrink(0)
 				}
 				ui.Text(c, shortenSource(candidate.Source)).FontSize(11).TextColor(p.Secondary)
-				ui.Spacer(c).Width(6)
+				ui.Box(c).Width(6).Shrink(0)
 				ui.Text(c, "Reveal").FontSize(11).TextColor(p.Accent)
 			})
 		if row.Clicked() {

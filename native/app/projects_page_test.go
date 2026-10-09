@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/saltand/kitter/native/core/model"
 	"github.com/saltand/kitter/native/core/effective"
+	"github.com/saltand/kitter/native/core/model"
 )
 
 // TestAddProjectPersistsToConfig is browse_project → remember_project:

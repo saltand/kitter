@@ -12,39 +12,44 @@ import (
 
 // settingsPage is settings_page in settings_page.rs.
 func (a *App) settingsPage(c *ui.Context) {
-	ui.Scroll(c).Fill().Padding(20).Children(func() {
-		ui.Column(c).MaxWidth(768).Children(func() {
-			// Preferences.
-			ui.Text(c, a.T("偏好设置", "Preferences")).FontSize(14).Bold().Margin(0, 0, 10, 0)
-			a.settingsCard(c, func() {
-				a.settingsRow(c,
-					a.T("语言", "Language"),
-					a.T("选择 Kitter 界面的显示语言。", "Choose the language used by Kitter."),
-					func() { a.languageControl(c) })
-			})
+	// The 768-point column is centered in the pane, as in the Rust build;
+	// the top 20 points drag the window.
+	ui.Scroll(c).Fill().Children(func() {
+		ui.Box(c).FillWidth().Height(20).Shrink(0).DragWindow()
+		ui.Row(c).FillWidth().Padding(0, 20, 40, 20).Justify(ui.Center).AlignItems(ui.Start).Children(func() {
+			ui.Column(c).Grow(1).MinWidth(0).MaxWidth(SettingsContentMaxWidth).Children(func() {
+				// Preferences.
+				ui.Text(c, a.T("偏好设置", "Preferences")).FontSize(14).FontWeight(500).Margin(0, 0, 10, 0)
+				a.settingsCard(c, func() {
+					a.settingsRow(c,
+						a.T("语言", "Language"),
+						a.T("选择 Kitter 界面的显示语言。", "Choose the language used by Kitter."),
+						func() { a.languageControl(c) })
+				})
 
-			ui.Text(c, a.T("外观", "Appearance")).FontSize(14).Bold().Margin(40, 0, 10, 0)
-			a.settingsCard(c, func() {
-				a.settingsRow(c,
-					a.T("主题", "Theme"),
-					a.T("跟随系统，或固定使用浅色与深色外观。", "Follow the system or use a fixed light or dark appearance."),
-					func() { a.themeControl(c) })
-			})
+				ui.Text(c, a.T("外观", "Appearance")).FontSize(14).FontWeight(500).Margin(40, 0, 10, 0)
+				a.settingsCard(c, func() {
+					a.settingsRow(c,
+						a.T("主题", "Theme"),
+						a.T("跟随系统，或固定使用浅色与深色外观。", "Follow the system or use a fixed light or dark appearance."),
+						func() { a.themeControl(c) })
+				})
 
-			ui.Text(c, a.T("技能库", "Skill library")).FontSize(14).Bold().Margin(40, 0, 10, 0)
-			a.settingsCard(c, func() {
-				a.settingsRow(c,
-					a.T("技能存放位置", "Skills location"),
-					a.T("Kitter 用来保存所有技能的文件夹。", "The folder where Kitter keeps all skills."),
-					func() { a.libraryDirControl(c) })
-			})
+				ui.Text(c, a.T("技能库", "Skill library")).FontSize(14).FontWeight(500).Margin(40, 0, 10, 0)
+				a.settingsCard(c, func() {
+					a.settingsRow(c,
+						a.T("技能存放位置", "Skills location"),
+						a.T("Kitter 用来保存所有技能的文件夹。", "The folder where Kitter keeps all skills."),
+						func() { a.libraryDirControl(c) })
+				})
 
-			ui.Text(c, a.T("更新", "Updates")).FontSize(14).Bold().Margin(40, 0, 10, 0)
-			a.settingsCard(c, func() {
-				a.settingsRow(c,
-					a.T("检查更新", "Check for updates"),
-					a.T("扫描所有技能的远端是否有新版本。", "Scan every skill's remote source for new versions."),
-					func() { a.updateControl(c) })
+				ui.Text(c, a.T("更新", "Updates")).FontSize(14).FontWeight(500).Margin(40, 0, 10, 0)
+				a.settingsCard(c, func() {
+					a.settingsRow(c,
+						a.T("检查更新", "Check for updates"),
+						a.T("扫描所有技能的远端是否有新版本。", "Scan every skill's remote source for new versions."),
+						func() { a.updateControl(c) })
+				})
 			})
 		})
 	})
@@ -53,7 +58,7 @@ func (a *App) settingsPage(c *ui.Context) {
 // settingsCard wraps a group of rows in a bordered card.
 func (a *App) settingsCard(c *ui.Context, children func()) {
 	p := a.Palette()
-	ui.Column(c).FillWidth().Radius(10).Border(1, p.Border).Background(p.Surface).Clip().
+	ui.Column(c).FillWidth().Radius(RadiusCard).Border(1, p.Border).Background(p.Surface).Clip().
 		Children(children)
 }
 
@@ -62,7 +67,7 @@ func (a *App) settingsRow(c *ui.Context, title, description string, control func
 	p := a.Palette()
 	ui.Row(c).MinHeight(60).Padding(12, 16).AlignItems(ui.Center).Gap(24).Children(func() {
 		ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-			ui.Text(c, title).FontSize(14)
+			ui.Text(c, title).FontSize(14).FontWeight(500)
 			ui.Text(c, description).FontSize(12).TextColor(p.Muted).Margin(2, 0, 0, 0)
 		})
 		control()
@@ -71,7 +76,6 @@ func (a *App) settingsRow(c *ui.Context, title, description string, control func
 
 // languageControl is the language dropdown.
 func (a *App) languageControl(c *ui.Context) {
-	p := a.Palette()
 	var label string
 	switch a.Library.Config.Language {
 	case config.LanguageZhCn:
@@ -81,11 +85,7 @@ func (a *App) languageControl(c *ui.Context) {
 	default:
 		label = a.T("跟随系统", "System")
 	}
-	ui.Row(c).Width(180).Height(30).Padding(0, 10).Radius(7).Border(1, p.Border).
-		AlignItems(ui.Center).Cursor(ui.CursorPointer).Key("language-select").Children(func() {
-		ui.Text(c, label).FontSize(13).Grow(1)
-		ui.Icon(c, iconSVG("chevron-down.svg")).TextColor(p.Muted)
-	}).Menu(func(m *ui.Menu) {
+	a.dropdownButton(c, label, "language-select").Width(180).Menu(func(m *ui.Menu) {
 		options := []struct {
 			lang  config.Language
 			label string
@@ -101,6 +101,18 @@ func (a *App) languageControl(c *ui.Context) {
 				a.setLanguage(opt.lang)
 			}
 		}
+	})
+}
+
+// dropdownButton is dropdown_button: a bordered control-height button
+// with the label left and a chevron right.
+func (a *App) dropdownButton(c *ui.Context, label, key string) ui.Element {
+	p := a.Palette()
+	return ui.Row(c).Height(ControlHeight).Padding(0, 8).Gap(4).Radius(RadiusControl).
+		Border(1, p.Border).Background(p.Surface).AlignItems(ui.Center).Shrink(0).
+		Cursor(ui.CursorPointer).Label(label).Key(key).Children(func() {
+		ui.Text(c, label).FontSize(14).Grow(1).MinWidth(0).SingleLine()
+		ui.Icon(c, iconSVG("chevron-down.svg")).Size(14, 14).TextColor(p.Muted).Shrink(0)
 	})
 }
 
@@ -124,12 +136,13 @@ func (a *App) themeControl(c *ui.Context) {
 	} {
 		opt := opt
 		selected := a.Library.Config.Theme == opt.theme
-		el := ui.Text(c, opt.label).FontSize(12).Padding(5, 10).Radius(7).Cursor(ui.CursorPointer).
-			Key(opt.key)
+		// small_choice: a 24-point pill, filled only when active.
+		el := textButton(c, opt.label, 24).FontSize(13).Padding(0, 10).Radius(12).
+			Cursor(ui.CursorPointer).Key(opt.key)
 		if selected {
 			el.Background(p.Selected).TextColor(p.Text)
 		} else {
-			el.Background(p.Raised).TextColor(p.Muted)
+			el.TextColor(p.Secondary)
 		}
 		el.Margin(0, 0, 0, 2).OnClick(func() {
 			a.setTheme(opt.theme)

@@ -48,7 +48,6 @@ func installableSkillsByGroup(skills []model.SkillSummary, groupIDs map[string]b
 
 // skillsPage is KitterApp::skills_page.
 func (a *App) skillsPage(c *ui.Context) {
-	t := c.Theme()
 	p := a.Palette()
 	query := strings.ToLower(strings.TrimSpace(a.Skills.Search))
 
@@ -123,16 +122,16 @@ func (a *App) skillsPage(c *ui.Context) {
 	}
 
 	ui.Split(c, &a.splitSize, func() {
-		a.skillListPane(c, t, rows, configuredGroups, selectionOrder, len(visible))
+		a.skillListPane(c, rows, configuredGroups, selectionOrder, len(visible))
 	}, func() {
-		a.skillDetail(c, t)
+		a.skillDetail(c)
 	}).Fill().MinWidth(0)
 	_ = p
 }
 
 // skillListPane is the left pane of skills_page. Rows are the flattened
 // list entries built by skillsPage.
-func (a *App) skillListPane(c *ui.Context, t *ui.Theme, rows []listEntry, groups []model.SkillGroup, selectionOrder []string, visibleCount int) {
+func (a *App) skillListPane(c *ui.Context, rows []listEntry, groups []model.SkillGroup, selectionOrder []string, visibleCount int) {
 	p := a.Palette()
 	query := strings.TrimSpace(a.Skills.Search)
 	selCount := len(a.selectedSkillKeys())
@@ -141,7 +140,7 @@ func (a *App) skillListPane(c *ui.Context, t *ui.Theme, rows []listEntry, groups
 	pane := ui.Column(c).Fill().MinWidth(0).Background(p.Surface)
 	pane.Children(func() {
 		// Panel header: title + count + add.
-		ui.Row(c).Height(52).Shrink(0).Padding(0, 12).AlignItems(ui.Center).Children(func() {
+		ui.Row(c).Height(52).Shrink(0).Padding(0, 12).AlignItems(ui.Center).DragWindow().Children(func() {
 			ui.Row(c).Gap(7).AlignItems(ui.Center).Grow(1).MinWidth(0).Children(func() {
 				ui.Text(c, a.T("技能", "Skills")).FontSize(14).Bold().SingleLine()
 				ui.Text(c, fmt.Sprint(len(a.Skills.Items))).Font(FontMono).FontSize(12).TextColor(p.Muted)
@@ -156,7 +155,7 @@ func (a *App) skillListPane(c *ui.Context, t *ui.Theme, rows []listEntry, groups
 		ui.Divider(c)
 
 		ui.Box(c).Padding(8, 10).Children(func() {
-			ui.SearchField(c, &a.Skills.Search).FillWidth().Label(a.T("搜索技能", "Search skills"))
+			a.searchField(c, &a.Skills.Search).Label(a.T("搜索技能", "Search skills"))
 		})
 
 		// Filter line: "全部 N" or "#path  N" plus the tag-filter menu button.
@@ -328,7 +327,6 @@ func (a *App) groupHeaderRow(c *ui.Context, groups []model.SkillGroup, groupID s
 // skillListRow is KitterApp::skill_list_row.
 func (a *App) skillListRow(c *ui.Context, skill *model.SkillSummary, nested bool, visibleOrder []string) {
 	p := a.Palette()
-	t := c.Theme()
 	storageName := SkillStorageName(skill)
 	builtIn := skill.Record.Origin.IsBuiltin()
 	selCount := len(a.selectedSkillKeys())
@@ -445,7 +443,7 @@ func (a *App) skillListRow(c *ui.Context, skill *model.SkillSummary, nested bool
 		ui.Icon(c, iconSVG(iconName)).TextColor(p.Secondary).Shrink(0)
 		ui.Column(c).Grow(1).MinWidth(0).Children(func() {
 			ui.Text(c, skill.Record.Name).Font(FontMono).FontSize(13).SingleLine()
-			ui.Text(c, a.skillInstallSummary(c, skill)).FontSize(12).TextColor(t.TextMuted).SingleLine()
+			ui.Text(c, a.skillInstallSummary(c, skill)).FontSize(12).TextColor(p.Muted).SingleLine()
 		})
 		a.skillManualBadge(c, skill)
 	})
@@ -534,7 +532,7 @@ func (a *App) tagFilterItem(m *ui.Menu, tag *tags.Tag, _ bool) {
 }
 
 // skillDetail is KitterApp::skill_detail.
-func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
+func (a *App) skillDetail(c *ui.Context) {
 	p := a.Palette()
 	if a.Skills.Selection.IsMultiple() && a.Skills.Selection.Len() > 1 {
 		a.multiSkillDetail(c)
@@ -544,7 +542,7 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 	if skill == nil {
 		ui.Column(c).Grow(1).Center().Children(func() {
 			ui.Text(c, a.T("添加第一个技能开始使用 Kitter", "Add your first skill to get started")).
-				TextColor(t.TextMuted)
+				TextColor(p.Muted)
 		})
 		return
 	}
@@ -554,8 +552,8 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 		// Header: icon, name, origin, actions, description, tag labels.
 		ui.Box(c).Padding(24, 24, 16, 24).Children(func() {
 			ui.Row(c).AlignItems(ui.Start).Children(func() {
-				ui.Box(c).Size(40, 40).Radius(8).Background(p.Raised).Shrink(0).Center().Children(func() {
-					ui.Icon(c, iconSVG("package.svg")).TextColor(p.Secondary)
+				ui.Box(c).Size(40, 40).Radius(RadiusControl).Background(p.Raised).Shrink(0).Center().Children(func() {
+					ui.Icon(c, iconSVG("package.svg")).Size(20, 20).TextColor(p.Secondary)
 				})
 				ui.Column(c).Grow(1).MinWidth(0).Margin(0, 0, 0, 14).Children(func() {
 					ui.Row(c).AlignItems(ui.Center).Gap(8).Children(func() {
@@ -567,21 +565,21 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 				})
 				ui.Row(c).Gap(8).Children(func() {
 					if skill.Record.UpdateAvailable {
-						if iconButton(c, "rotate-cw.svg", 30, 16).TextColor(p.Secondary).
-							Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+						if iconButton(c, "rotate-cw.svg", ControlHeight, 16).TextColor(p.Secondary).
+							Radius(RadiusControl).Cursor(ui.CursorPointer).
 							Label(a.T("更新", "Update")).Tooltip(a.T("更新", "Update")).
 							Key("update-skill").Clicked() {
 							a.updateSkill(storageName)
 						}
 					}
-					if iconButton(c, "trash.svg", 30, 16).TextColor(p.Danger).
-						Background(p.DangerSoft).Radius(8).Cursor(ui.CursorPointer).
+					if iconButton(c, "trash.svg", ControlHeight, 16).TextColor(p.Danger).
+						Background(p.DangerSoft).Radius(RadiusControl).Cursor(ui.CursorPointer).
 						Label(a.T("删除技能", "Delete Skill")).Tooltip(a.T("删除技能", "Delete Skill")).
 						Key("delete-skill").Clicked() {
 						a.openLibraryDelete([]model.SkillSummary{*skill})
 					}
-					if iconButton(c, "download.svg", 30, 16).TextColor(p.Secondary).
-						Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+					if iconButton(c, "download.svg", ControlHeight, 16).TextColor(p.Secondary).
+						Background(p.Raised).Radius(RadiusControl).Cursor(ui.CursorPointer).
 						Label(a.T("安装技能", "Install Skill")).Tooltip(a.T("安装技能", "Install Skill")).Clicked() {
 						a.openInstallDialog()
 					}
@@ -591,14 +589,14 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 			if description == "" {
 				description = a.T("这个技能暂时没有描述。", "This skill does not have a description yet.")
 			}
-			ui.Text(c, description).FontSize(14).TextColor(p.Secondary).
+			ui.Text(c, description).FontSize(14).LineHeight(1.5).TextColor(p.Secondary).
 				Margin(16, 0, 0, 0).MaxWidth(descriptionMaxW).Selectable()
 			a.skillTagLabels(c, storageName)
 		})
 
 		// Tabs: Installs / Content.
 		ui.Row(c).Height(40).Padding(0, 24).Gap(2).AlignItems(ui.Center).
-			Border(1, p.Border).Shrink(0).Children(func() {
+			BorderWidth(0, 0, 1, 0).BorderColor(p.Border).Shrink(0).Children(func() {
 			a.detailTab(c, a.T("安装情况", "Installs"), DetailInstalls)
 			a.detailTab(c, a.T("内容", "Content"), DetailContent)
 		})
@@ -614,7 +612,7 @@ func (a *App) skillDetail(c *ui.Context, t *ui.Theme) {
 func (a *App) detailTab(c *ui.Context, label string, tab DetailTab) {
 	p := a.Palette()
 	active := a.Skills.Tab == tab
-	el := ui.Text(c, label).FontSize(13).Height(30).Padding(0, 8).Radius(8).
+	el := textButton(c, label, ControlHeight).FontSize(13).Padding(0, 8).Radius(RadiusControl).
 		Cursor(ui.CursorPointer).Key("detail-tab-" + label)
 	if active {
 		el.Background(p.Selected).TextColor(p.Text)
@@ -723,7 +721,7 @@ func (a *App) installsTab(c *ui.Context, skill *model.SkillSummary) {
 	ui.Scroll(c).Grow(1).MinHeight(0).Padding(24, 24).Children(func() {
 		if len(projects) == 0 {
 			ui.Column(c).Margin(34, 0, 0, 0).AlignItems(ui.Center).Children(func() {
-				ui.Icon(c, iconSVG("package.svg")).TextColor(p.Muted)
+				ui.Icon(c, iconSVG("package.svg")).Size(28, 28).TextColor(p.Muted)
 				ui.Text(c, a.T("尚未安装", "Not installed yet")).FontSize(12).
 					TextColor(p.Muted).Margin(10, 0, 0, 0)
 			})
@@ -748,17 +746,17 @@ func (a *App) installsTab(c *ui.Context, skill *model.SkillSummary) {
 			}
 			projectPath := path
 			skillCopy := model.ProjectSkill{Name: skill.Record.Name, Installations: installations}
-			ui.Row(c).Height(64).Padding(0, 14).AlignItems(ui.Center).Gap(11).
-				Border(1, p.Border).Children(func() {
-				ui.Icon(c, iconSVG("folder.svg")).TextColor(p.Secondary).Shrink(0)
-				ui.Column(c).Grow(1).MinWidth(0).Children(func() {
+			ui.Row(c).Height(64).Padding(0, 14).AlignItems(ui.Center).
+				BorderWidth(0, 0, 1, 0).BorderColor(p.Border).Children(func() {
+				ui.Icon(c, iconSVG("folder.svg")).Size(16, 16).TextColor(p.Secondary).Shrink(0)
+				ui.Column(c).Grow(1).MinWidth(0).Margin(0, 0, 0, 11).Children(func() {
 					ui.Text(c, name).Font(FontMono).FontSize(13).Selectable().SingleLine()
 					ui.Text(c, displayPath(projectPath)).Font(FontMono).FontSize(12).
-						TextColor(p.Muted).Selectable().SingleLine()
+						TextColor(p.Muted).Margin(3, 0, 0, 0).Selectable().SingleLine()
 				})
 				a.agentBadges(c, targets, false)
-				if iconButton(c, "trash.svg", 30, 16).TextColor(p.Danger).
-					Background(p.DangerSoft).Radius(8).Margin(0, 0, 0, 10).Cursor(ui.CursorPointer).
+				if iconButton(c, "trash.svg", ControlHeight, 16).TextColor(p.Danger).
+					Background(p.DangerSoft).Radius(RadiusControl).Margin(0, 0, 0, 10).Cursor(ui.CursorPointer).
 					Label(a.T("移除", "Remove")).Tooltip(a.T("移除", "Remove")).
 					Key("remove-install-" + projectPath).Clicked() {
 					a.openProjectDelete(projectPath, skillCopy)
@@ -808,7 +806,7 @@ func (a *App) contentTab(c *ui.Context, skill *model.SkillSummary) {
 		return entries[i].dir && !entries[j].dir // dirs first on ties
 	})
 
-	ui.Row(c).Grow(1).MinHeight(0).MinWidth(0).Children(func() {
+	ui.Row(c).Grow(1).MinHeight(0).MinWidth(0).AlignItems(ui.Stretch).Children(func() {
 		tree := ui.Scroll(c).Width(220).Shrink(0).MinHeight(0).Padding(8, 0)
 		tree.Background(p.Surface)
 		tree.Children(func() {
@@ -876,7 +874,7 @@ func (a *App) contentTab(c *ui.Context, skill *model.SkillSummary) {
 		ui.Box(c).Width(1).Shrink(0).Background(p.Border)
 		ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Children(func() {
 			ui.Row(c).Height(40).Padding(0, 14).Shrink(0).AlignItems(ui.Center).
-				Background(p.Surface).Border(1, p.Border).Children(func() {
+				Background(p.Surface).BorderWidth(0, 0, 1, 0).BorderColor(p.Border).Children(func() {
 				ui.Text(c, a.Skills.SelectedFile).Font(FontMono).FontSize(12).
 					TextColor(p.Secondary).Selectable().SingleLine()
 			})
@@ -943,6 +941,13 @@ func (a *App) agentBadges(c *ui.Context, targets []model.InstallTarget, includeG
 			}
 		}
 	}
+	a.renderAgentBadges(c, visible)
+}
+
+// renderAgentBadges is render_agent_badges: up to five overlapping light
+// discs with a white ring (also in dark mode, as the Rust build draws
+// them), then a "+N" disc.
+func (a *App) renderAgentBadges(c *ui.Context, visible []agents.AgentIconInfo) {
 	if len(visible) == 0 {
 		ui.Box(c).Width(0)
 		return
@@ -956,17 +961,19 @@ func (a *App) agentBadges(c *ui.Context, targets []model.InstallTarget, includeG
 	p := a.Palette()
 	ui.Row(c).Shrink(0).AlignItems(ui.Center).Children(func() {
 		for i, agent := range shown {
-			icon := ui.Icon(c, iconSVG(agent.IconPath)).
-				Size(25, 25).TextColor(ui.RGB(0x33, 0x33, 0x33)).
+			badge := ui.Box(c).Size(25, 25).Radius(12.5).Border(1, ui.RGB(0xFF, 0xFF, 0xFF)).
+				Background(ui.RGB(0xF5, 0xF5, 0xF5)).Center().Shrink(0).
 				Tooltip(agent.Name).Label(agent.Name)
 			if i > 0 {
-				icon.Margin(0, 0, 0, -5)
+				badge.Margin(0, 0, 0, -5)
 			}
+			badge.Children(func() { brandIcon(c, agent.IconPath, 17).TextColor(PaletteLight().Text) })
 		}
 		if hidden > 0 {
-			ui.Text(c, fmt.Sprintf("+%d", hidden)).Font(FontMono).FontSize(9).
-				TextColor(p.Muted).Margin(0, 0, 0, -5).
-				Label(fmt.Sprintf("+%d agents", hidden))
+			ui.Box(c).Size(25, 25).Radius(12.5).Background(p.Raised).Center().Shrink(0).
+				Margin(0, 0, 0, -5).Label(fmt.Sprintf("+%d agents", hidden)).Children(func() {
+				ui.Text(c, fmt.Sprintf("+%d", hidden)).Font(FontMono).FontSize(8).TextColor(p.Muted)
+			})
 		}
 	})
 }
@@ -978,14 +985,14 @@ func (a *App) deleteModal(c *ui.Context) {
 		return
 	}
 	p := a.Palette()
-	ui.Modal(c, &a.Skills.DeleteOpen, func() {
-		panel := ui.Column(c).Width(460).Background(p.Elevated).Radius(12).Clip()
+	a.dialog(c, &a.Skills.DeleteOpen, func() {
+		panel := ui.Column(c).Width(460).Background(p.Elevated).Radius(RadiusModal).Clip()
 		panel.Children(func() {
 			ui.Box(c).Padding(20).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, a.deleteTitle()).FontSize(16).Bold().Grow(1).MinWidth(0)
-					if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
-						Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+					if iconButton(c, "x.svg", ControlHeight, 14).TextColor(p.Text).
+						Background(p.Raised).Radius(RadiusControl).Cursor(ui.CursorPointer).
 						Key("close-delete-modal").Clicked() {
 						a.Skills.DeleteOpen = false
 						a.Skills.DeleteSkills = nil
@@ -1035,7 +1042,7 @@ func (a *App) deleteModal(c *ui.Context) {
 			})
 			ui.Row(c).Height(60).Padding(0, 18).AlignItems(ui.Center).Justify(ui.End).Gap(8).
 				Border(1, p.Border).Children(func() {
-				if ui.Text(c, a.T("取消", "Cancel")).Height(34).Padding(0, 16).Radius(8).
+				if textButton(c, a.T("取消", "Cancel"), 34).Padding(0, 16).Radius(8).
 					FontSize(14).Cursor(ui.CursorPointer).Key("cancel-delete").Clicked() {
 					a.Skills.DeleteOpen = false
 					a.Skills.DeleteSkills = nil
@@ -1044,7 +1051,7 @@ func (a *App) deleteModal(c *ui.Context) {
 				canConfirm := !a.Skills.DeleteBusy &&
 					(a.Skills.DeleteProjectSkill == nil || len(a.Skills.DeleteSelected) > 0)
 				label := a.deleteAction()
-				btn := ui.Text(c, label).Height(34).Padding(0, 16).Radius(8).FontSize(14).
+				btn := textButton(c, label, 34).Padding(0, 16).Radius(8).FontSize(14).
 					Key("confirm-delete")
 				if canConfirm {
 					btn.Background(p.Danger).TextColor(p.OnAccent).Cursor(ui.CursorPointer)

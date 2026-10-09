@@ -38,23 +38,23 @@ const (
 
 // AddFlowState is AddFlowState in state.rs.
 type AddFlowState struct {
-	Open           bool
-	Kind           AddKind
-	Task           *AddTask
-	Scan           *source.SkillScan
-	AdoptionScan   *adoption.AdoptionScan
-	Selected       map[string]bool
-	Error          string
-	GroupEnabled   bool
-	GroupName      string
-	PrimaryInput   string
-	AdoptionRoot   string
-	AdoptionCancel context.CancelFunc
-	scanGen        uint64
-	adoptionGen    uint64
+	Open             bool
+	Kind             AddKind
+	Task             *AddTask
+	Scan             *source.SkillScan
+	AdoptionScan     *adoption.AdoptionScan
+	Selected         map[string]bool
+	Error            string
+	GroupEnabled     bool
+	GroupName        string
+	PrimaryInput     string
+	AdoptionRoot     string
+	AdoptionCancel   context.CancelFunc
+	scanGen          uint64
+	adoptionGen      uint64
 	adoptionRows     []adoptionRow
 	adoptionExpanded map[string]bool
-	adoptionList   ui.ListState
+	adoptionList     ui.ListState
 }
 
 // PickDirectory is the directory-chooser seam: mygo.Dialog.Open in the

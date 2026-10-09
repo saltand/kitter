@@ -35,12 +35,12 @@ func TestDropHalfTable(t *testing.T) {
 func TestTagDropAllowedTable(t *testing.T) {
 	a, b := tags.TagID(1), tags.TagID(2)
 	for _, tc := range []struct {
-		name         string
-		drag         *tagDrag
-		scope        TagScope
-		parent       *tags.TagID
-		target       tags.TagID
-		want         bool
+		name   string
+		drag   *tagDrag
+		scope  TagScope
+		parent *tags.TagID
+		target tags.TagID
+		want   bool
 	}{
 		{"same level root", &tagDrag{Scope: TagScopeSkills, ID: a}, TagScopeSkills, nil, b, true},
 		{"self", &tagDrag{Scope: TagScopeSkills, ID: a}, TagScopeSkills, nil, a, false},

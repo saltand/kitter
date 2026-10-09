@@ -16,34 +16,34 @@ func (a *App) addDialog(c *ui.Context) {
 	}
 	p := a.Palette()
 	busy := a.addBusy()
-	ui.Modal(c, &a.AddFlow.Open, func() {
-		panel := ui.Column(c).Width(640).Height(560).Background(p.Elevated).Radius(12).Clip()
+	a.dialog(c, &a.AddFlow.Open, func() {
+		panel := ui.Column(c).Width(640).Height(560).Background(p.Elevated).Radius(RadiusModal).Clip()
 		panel.Children(func() {
-			ui.Box(c).Padding(20).Children(func() {
+			ui.Column(c).Grow(1).MinHeight(0).Padding(20).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, a.T("添加技能", "Add Skill")).FontSize(16).Bold().Grow(1)
-					if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
-						Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+					if iconButton(c, "x.svg", ControlHeight, 14).TextColor(p.Text).
+						Background(p.Raised).Radius(RadiusControl).Cursor(ui.CursorPointer).
 						Key("add-close").Clicked() {
 						a.closeAddModal()
 					}
 				})
-				ui.Spacer(c).Height(16)
+				ui.Box(c).Height(16).Shrink(0)
 				a.addKindSelector(c)
-				ui.Spacer(c).Height(12)
+				ui.Box(c).Height(12).Shrink(0)
 				a.addInputRow(c)
-				ui.Spacer(c).Height(8)
+				ui.Box(c).Height(8).Shrink(0)
 				a.addOptionsRow(c)
-				ui.Spacer(c).Height(8)
+				ui.Box(c).Height(8).Shrink(0)
 				a.addResultArea(c)
 				if a.AddFlow.Error != "" {
 					ui.Text(c, a.AddFlow.Error).FontSize(12).TextColor(p.Danger).Wrap()
-					ui.Spacer(c).Height(8)
+					ui.Box(c).Height(8).Shrink(0)
 				}
 			})
-			ui.Row(c).Height(60).Padding(0, 18).AlignItems(ui.Center).Justify(ui.End).Gap(8).
-				Border(1, p.Border).Children(func() {
-				if ui.Text(c, a.T("取消", "Cancel")).Height(34).Padding(0, 16).Radius(8).
+			ui.Row(c).Height(60).Padding(0, 20).AlignItems(ui.Center).Justify(ui.End).Gap(8).
+				BorderWidth(1, 0, 0, 0).BorderColor(p.Border).Children(func() {
+				if textButton(c, a.T("取消", "Cancel"), DialogControlHeight).Padding(0, 16).Radius(RadiusControl).
 					FontSize(14).Cursor(ui.CursorPointer).Key("add-cancel").Clicked() {
 					a.closeAddModal()
 				}
@@ -53,7 +53,7 @@ func (a *App) addDialog(c *ui.Context) {
 				}
 				enabled := !busy && len(a.AddFlow.Selected) > 0 &&
 					(a.AddFlow.Scan != nil || a.AddFlow.AdoptionScan != nil)
-				btn := ui.Text(c, label).Height(34).Padding(0, 16).Radius(8).FontSize(14).Key("add-confirm")
+				btn := textButton(c, label, DialogControlHeight).Padding(0, 16).Radius(RadiusControl).FontSize(14).Key("add-confirm")
 				if enabled {
 					btn.Background(p.Accent).TextColor(p.OnAccent).Cursor(ui.CursorPointer)
 					if btn.Clicked() {
@@ -83,7 +83,7 @@ func (a *App) addKindSelector(c *ui.Context) {
 		for _, k := range kinds {
 			k := k
 			active := a.AddFlow.Kind == k.kind
-			tab := ui.Text(c, k.label).Height(30).Padding(0, 12).Radius(8).FontSize(13)
+			tab := textButton(c, k.label, 30).Padding(0, 12).Radius(8).FontSize(13)
 			if active {
 				tab.Background(p.Accent).TextColor(p.OnAccent)
 			} else {
@@ -106,7 +106,7 @@ func (a *App) addInputRow(c *ui.Context) {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.TextInput(c, &a.AddFlow.PrimaryInput).
 				Grow(1).Height(34).FontSize(13).Label("add-local-path")
-			browse := ui.Text(c, a.T("浏览…", "Browse…")).Height(34).Padding(0, 12).Radius(8).
+			browse := textButton(c, a.T("浏览…", "Browse…"), 34).Padding(0, 12).Radius(8).
 				FontSize(13).Key("add-browse")
 			if !busy {
 				browse.Background(p.Raised).TextColor(p.Text).Cursor(ui.CursorPointer)
@@ -126,7 +126,7 @@ func (a *App) addInputRow(c *ui.Context) {
 			input := ui.TextInput(c, &a.AddFlow.PrimaryInput).
 				Grow(1).Height(34).FontSize(13).Label("add-source-input")
 			input.Placeholder(placeholder)
-			scan := ui.Text(c, a.T("扫描", "Scan")).Height(34).Padding(0, 12).Radius(8).
+			scan := textButton(c, a.T("扫描", "Scan"), 34).Padding(0, 12).Radius(8).
 				FontSize(13).Key("add-scan")
 			if !busy {
 				scan.Background(p.Raised).TextColor(p.Text).Cursor(ui.CursorPointer)
@@ -145,7 +145,7 @@ func (a *App) addInputRow(c *ui.Context) {
 			if a.AddFlow.AdoptionRoot != "" {
 				label = a.T("重新扫描", "Rescan")
 			}
-			btn := ui.Text(c, label).Height(34).Padding(0, 12).Radius(8).FontSize(13).Key("add-existing-scan")
+			btn := textButton(c, label, 34).Padding(0, 12).Radius(8).FontSize(13).Key("add-existing-scan")
 			if !busy {
 				btn.Background(p.Raised).TextColor(p.Text).Cursor(ui.CursorPointer)
 				if btn.Clicked() {
@@ -155,7 +155,7 @@ func (a *App) addInputRow(c *ui.Context) {
 				btn.Background(p.Raised).TextColor(p.Muted)
 			}
 			if a.AddFlow.AdoptionScan != nil || a.AddFlow.AdoptionRoot != "" {
-				browse := ui.Text(c, a.T("更改来源…", "Change source…")).Height(34).Padding(0, 12).
+				browse := textButton(c, a.T("更改来源…", "Change source…"), 34).Padding(0, 12).
 					Radius(8).FontSize(13).Key("add-existing-browse")
 				if !busy {
 					browse.Background(p.Raised).TextColor(p.Text).Cursor(ui.CursorPointer)
@@ -201,7 +201,7 @@ func (a *App) addResultArea(c *ui.Context) {
 	skills := a.AddFlow.Scan.Skills()
 	ui.Row(c).AlignItems(ui.Center).Margin(0, 0, 4, 0).Children(func() {
 		ui.Text(c, fmt.Sprintf("%d", len(skills))).FontSize(12).TextColor(p.Muted)
-		ui.Spacer(c).Width(6)
+		ui.Box(c).Width(6).Shrink(0)
 		ui.Text(c, a.T("找到技能", "Found skills")).FontSize(12).TextColor(p.Secondary)
 	})
 	ui.Box(c).MaxHeight(240).Grow(1).MinHeight(0).Children(func() {

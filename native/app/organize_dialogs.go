@@ -24,19 +24,18 @@ func (a *App) tagsDialog(c *ui.Context) {
 	}
 	state := a.tagsFor(scope)
 
-	ui.Modal(c, &f.Open, func() {
-		ui.Column(c).Width(400).Background(p.Elevated).Radius(12).Clip().Children(func() {
+	a.dialog(c, &f.Open, func() {
+		ui.Column(c).Width(400).Background(p.Elevated).Radius(RadiusModal).Clip().Children(func() {
 			// Header.
-			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
+			ui.Row(c).Padding(20, 20, 14, 20).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, title).FontSize(16).Bold().Grow(1)
-				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
-					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+				if iconButton(c, "x.svg", ControlHeight, 14).TextColor(p.Text).
+					Background(p.Raised).Radius(RadiusControl).Cursor(ui.CursorPointer).
 					Key("close-tags-modal").Clicked() {
 					f.Open = false
 				}
 			})
-			ui.Box(c).Height(1).Background(p.Border)
-			ui.Scroll(c).Grow(1).MinHeight(0).MaxHeight(560).Padding(10, 16, 18, 16).Children(func() {
+			ui.Scroll(c).MaxHeight(560).Padding(0, 20, 18, 20).Children(func() {
 				// Delete confirmation panel.
 				if f.DeletePending != nil {
 					id := *f.DeletePending
@@ -194,22 +193,21 @@ func (a *App) assignTagsDialog(c *ui.Context) {
 	}
 	state := a.tagsFor(scope)
 
-	ui.Modal(c, &f.AssignOpen, func() {
-		ui.Column(c).Width(360).Background(p.Elevated).Radius(12).Clip().Children(func() {
-			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
+	a.dialog(c, &f.AssignOpen, func() {
+		ui.Column(c).Width(360).Background(p.Elevated).Radius(RadiusModal).Clip().Children(func() {
+			ui.Row(c).Padding(20, 20, 14, 20).AlignItems(ui.Center).Children(func() {
 				ui.Column(c).Grow(1).MinWidth(0).Children(func() {
 					ui.Text(c, a.T("设置标签", "Set tags")).FontSize(16).Bold()
 					ui.Text(c, label).FontSize(12).Font(FontMono).TextColor(p.Muted).
 						SingleLine().Margin(3, 0, 0, 0)
 				})
-				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
-					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+				if iconButton(c, "x.svg", ControlHeight, 14).TextColor(p.Text).
+					Background(p.Raised).Radius(RadiusControl).Cursor(ui.CursorPointer).
 					Key("close-tag-assignment").Clicked() {
 					f.AssignOpen = false
 				}
 			})
-			ui.Box(c).Height(1).Background(p.Border)
-			ui.Scroll(c).Grow(1).MinHeight(0).MaxHeight(480).Padding(8, 16, 16, 16).Children(func() {
+			ui.Scroll(c).MaxHeight(480).Padding(0, 20, 16, 20).Children(func() {
 				if len(state.TagsList()) == 0 {
 					ui.Text(c, a.T("还没有标签", "No tags yet")).FontSize(13).TextColor(p.Muted).
 						Padding(10, 0, 10, 0)
@@ -274,18 +272,17 @@ func (a *App) groupsDialog(c *ui.Context) {
 		return
 	}
 	p := a.Palette()
-	ui.Modal(c, &f.Open, func() {
-		ui.Column(c).Width(360).Background(p.Elevated).Radius(12).Clip().Children(func() {
-			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
+	a.dialog(c, &f.Open, func() {
+		ui.Column(c).Width(360).Background(p.Elevated).Radius(RadiusModal).Clip().Children(func() {
+			ui.Row(c).Padding(20, 20, 14, 20).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, a.T("分组", "Groups")).FontSize(16).Bold().Grow(1)
-				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
-					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
+				if iconButton(c, "x.svg", ControlHeight, 14).TextColor(p.Text).
+					Background(p.Raised).Radius(RadiusControl).Cursor(ui.CursorPointer).
 					Key("close-groups-modal").Clicked() {
 					f.Open = false
 				}
 			})
-			ui.Box(c).Height(1).Background(p.Border)
-			ui.Scroll(c).Grow(1).MinHeight(0).MaxHeight(480).Padding(10, 16, 18, 16).Children(func() {
+			ui.Scroll(c).MaxHeight(480).Padding(0, 20, 18, 20).Children(func() {
 				groups := a.Library.Groups()
 				if len(groups) == 0 {
 					ui.Text(c, a.T("还没有分组", "No groups yet")).FontSize(13).TextColor(p.Muted).
@@ -394,8 +391,8 @@ func (a *App) deleteGroupDialog(c *ui.Context) {
 			name = group.Name
 		}
 	}
-	ui.Modal(c, &f.DeleteOpen, func() {
-		ui.Column(c).Width(360).Background(p.Elevated).Radius(12).Clip().Padding(16).Children(func() {
+	a.dialog(c, &f.DeleteOpen, func() {
+		ui.Column(c).Width(360).Background(p.Elevated).Radius(RadiusModal).Clip().Padding(20).Children(func() {
 			ui.Text(c, fmt.Sprintf("%s %s?", a.T("删除分组", "Delete group"), name)).FontSize(15).Bold()
 			ui.Text(c, a.T("同时删除其中的技能", "Also delete the skills inside")).
 				FontSize(12).TextColor(p.Secondary).Margin(6, 0, 0, 0)
@@ -437,8 +434,8 @@ func (a *App) moveGroupDialog(c *ui.Context) {
 		return
 	}
 	p := a.Palette()
-	ui.Modal(c, &f.MoveOpen, func() {
-		ui.Column(c).Width(320).Background(p.Elevated).Radius(12).Clip().Padding(16).Children(func() {
+	a.dialog(c, &f.MoveOpen, func() {
+		ui.Column(c).Width(320).Background(p.Elevated).Radius(RadiusModal).Clip().Padding(20).Children(func() {
 			ui.Text(c, a.T("移动分组", "Move to group")).FontSize(15).Bold()
 			var name string
 			if len(f.MoveSkills) == 1 {

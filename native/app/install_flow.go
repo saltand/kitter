@@ -5,6 +5,7 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/saltand/kitter/native/core/agents"
@@ -114,59 +115,62 @@ func (a *App) installSelected(c *ui.Context) {
 	}
 }
 
-// installDialog is install_modal.
+// installDialog is install_modal: "Install {name}", a project dropdown
+// (Global first) with a browse button, the target group in a scrolling
+// body, and a 60-point footer.
 func (a *App) installDialog(c *ui.Context) {
 	if !a.InstallFlow.Modal {
 		return
 	}
 	p := a.Palette()
-	home := homeDir()
+	keys := a.selectedSkillKeys()
+	name := a.T("技能", "Skill")
+	if len(keys) > 1 {
+		if a.UsesEnglish() {
+			name = Counted(len(keys), "skill", "skills")
+		} else {
+			name = fmt.Sprintf("%d 个技能", len(keys))
+		}
+	} else if targets := a.selectedLibraryTargets(); len(targets) == 1 {
+		name = targets[0].Record.Name
+	}
+	title := a.T("安装 ", "Install ") + name
 
-	ui.Modal(c, &a.InstallFlow.Modal, func() {
-		ui.Column(c).Width(440).Background(p.Elevated).Radius(12).Clip().Children(func() {
-			// Header.
-			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, a.T("安装技能", "Install Skill")).FontSize(16).Bold().Grow(1)
-				if iconButton(c, "x.svg", 30, 14).TextColor(p.Text).
-					Background(p.Raised).Radius(8).Cursor(ui.CursorPointer).
-					Key("install-close").Clicked() {
+	a.dialog(c, &a.InstallFlow.Modal, func() {
+		ui.Column(c).Width(560).Background(p.Elevated).Radius(RadiusModal).Clip().Children(func() {
+			ui.Row(c).Padding(20, 20, 14, 20).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, title).FontSize(16).FontWeight(600).Grow(1).MinWidth(0).SingleLine()
+				if iconButton(c, "x.svg", ControlHeight, 14).TextColor(p.Text).
+					Background(p.Raised).Radius(RadiusControl).Cursor(ui.CursorPointer).
+					Label(a.T("关闭", "Close")).Key("install-close").Clicked() {
 					a.InstallFlow.Modal = false
 				}
 			})
-			ui.Box(c).Height(1).Background(p.Border)
-
-			ui.Box(c).Padding(16).Children(func() {
-				// Scope toggle.
+			ui.Scroll(c).MaxHeight(500).Padding(0, 20, 20, 20).Children(func() {
+				ui.Text(c, a.T("安装到", "Install to")).FontSize(14).TextColor(p.Muted).Margin(0, 0, 7, 0)
 				ui.Row(c).Gap(8).Children(func() {
-					a.installScopeButton(c, false, a.T("项目", "Project"), "install-scope-project")
-					a.installScopeButton(c, true, a.T("全局", "Global"), "install-scope-global")
+					a.installProjectSelect(c)
+					if iconButton(c, "folder.svg", ControlHeight, 16).TextColor(p.Text).
+						Background(p.Surface).Border(1, p.Border).Radius(RadiusControl).
+						Cursor(ui.CursorPointer).Label(a.T("浏览", "Browse")).
+						Key("install-browse-project").Clicked() {
+						a.browseProject()
+						a.InstallFlow.Global = false
+					}
 				})
-				ui.Spacer(c).Height(14)
-
-				// Project select.
-				ui.Text(c, a.T("项目", "Project")).FontSize(12).TextColor(p.Secondary)
-				ui.Spacer(c).Height(6)
-				a.installProjectRow(c, home)
-				ui.Spacer(c).Height(14)
-
-				// Target grid.
-				ui.Text(c, a.T("安装到", "Install to")).FontSize(12).TextColor(p.Secondary)
-				ui.Spacer(c).Height(8)
+				ui.Text(c, a.T("安装位置", "Install location")).FontSize(13).TextColor(p.Secondary).
+					Margin(18, 0, 7, 0)
 				a.installTargetGrid(c)
 			})
-
-			ui.Box(c).Height(1).Background(p.Border)
-			// Footer.
-			ui.Row(c).Padding(14, 16).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, a.T("全局安装会同步到所有项目视图", "Global installs apply to every project view")).
-					FontSize(11).TextColor(p.Muted).Grow(1)
-				if ui.Text(c, a.T("取消", "Cancel")).FontSize(12).Padding(6, 14).Radius(8).
-					Border(1, p.Border).Cursor(ui.CursorPointer).Key("install-cancel").Clicked() {
+			ui.Row(c).Height(60).Padding(0, 20).Gap(8).AlignItems(ui.Center).Justify(ui.End).
+				BorderWidth(1, 0, 0, 0).BorderColor(p.Border).FontSize(14).Children(func() {
+				if textButton(c, a.T("取消", "Cancel"), DialogControlHeight).Padding(0, 16).
+					Radius(RadiusControl).Cursor(ui.CursorPointer).Key("install-cancel").Clicked() {
 					a.InstallFlow.Modal = false
 				}
 				enabled := a.installHasTarget()
-				btn := ui.Text(c, a.T("安装", "Install")).FontSize(12).Padding(6, 16).Radius(8).
-					Key("install-confirm")
+				btn := textButton(c, a.T("安装", "Install"), DialogControlHeight).Padding(0, 16).
+					Radius(RadiusControl).Border(1, p.Border).Key("install-confirm")
 				if enabled {
 					btn.Background(p.Accent).TextColor(p.OnAccent).Cursor(ui.CursorPointer)
 				} else {
@@ -182,111 +186,136 @@ func (a *App) installDialog(c *ui.Context) {
 	})
 }
 
-// installScopeButton is the Global/Project toggle in install_modal.
-func (a *App) installScopeButton(c *ui.Context, global bool, label, key string) {
-	p := a.Palette()
-	selected := a.InstallFlow.Global == global
-	el := ui.Text(c, label).FontSize(12).Padding(5, 12).Radius(8).Cursor(ui.CursorPointer).Key(key)
-	if selected {
-		el.Background(p.Selected).TextColor(p.Text)
-	} else {
-		el.Background(p.Raised).TextColor(p.Muted)
+// installProjectSelect is the install-project-select dropdown: Global
+// (the home folder) first, then every known project.
+func (a *App) installProjectSelect(c *ui.Context) {
+	label := a.T("全局", "Global")
+	if !a.InstallFlow.Global {
+		label = a.T("选择一个项目", "Choose a project")
+		if a.Projects.OpenProject != "" {
+			label = filepath.Base(a.Projects.OpenProject)
+		}
 	}
-	el.OnClick(func() {
-		a.InstallFlow.Global = global
+	home := homeDir()
+	a.dropdownButton(c, label, "install-project-select").Grow(1).MinWidth(0).Menu(func(m *ui.Menu) {
+		if home != "" && m.Item(a.T("全局", "Global")+"  "+displayPath(home)).Checked(a.InstallFlow.Global).Chosen() {
+			a.InstallFlow.Global = true
+		}
+		for _, path := range a.Library.Config.ProjectPaths() {
+			if path == home {
+				continue
+			}
+			path := path
+			active := !a.InstallFlow.Global && a.Projects.OpenProject == path
+			if m.Item(filepath.Base(path) + "  " + displayPath(path)).Checked(active).Chosen() {
+				a.InstallFlow.Global = false
+				a.Projects.OpenProject = path
+			}
+		}
 	})
 }
 
-// installProjectRow renders the project combobox equivalent: the
-// current selection plus browse + recent choices.
-func (a *App) installProjectRow(c *ui.Context, home string) {
+// installTargetGrid is target_group: the Universal card (.agents/skills,
+// with the agents that read it in a 3-column grid) and the
+// agent-specific targets below it.
+func (a *App) installTargetGrid(c *ui.Context) {
 	p := a.Palette()
-	current := a.Projects.OpenProject
-	ui.Row(c).Height(36).Padding(0, 10).Radius(8).Border(1, p.Border).
-		AlignItems(ui.Center).Gap(8).Children(func() {
-		ui.Icon(c, iconSVG("folder.svg")).TextColor(p.Secondary).Shrink(0)
-		label := a.T("选择项目", "Choose a project")
-		if current != "" {
-			label = displayPath(current)
+	universal := a.InstallFlow.SelectedTargets[model.TargetUniversal]
+	var shared []agents.AgentIconInfo
+	for _, info := range agents.AgentIconOrder {
+		if !info.GlobalOnly && info.SupportsTarget(model.TargetUniversal) {
+			shared = append(shared, info)
 		}
-		ui.Text(c, label).FontSize(13).Font(FontMono).Grow(1).SingleLine().
-			TextColor(p.Text)
-		if iconButton(c, "ellipsis.svg", 20, 14).TextColor(p.Muted).
-			Cursor(ui.CursorPointer).Key("install-browse-project").Clicked() {
-			a.browseProject()
-		}
-	})
-	ui.Spacer(c).Height(6)
-	ui.Column(c).Children(func() {
-		for _, path := range a.Library.Config.ProjectPaths() {
-			path := path
-			selected := path == current
-			row := ui.Row(c).Height(28).Padding(0, 10).AlignItems(ui.Center).Gap(8).
-				Cursor(ui.CursorPointer).Radius(6).
-				Key("install-project-" + path).
-				Children(func() {
-					ui.Text(c, displayPath(path)).FontSize(12).Font(FontMono).Grow(1).SingleLine()
-					if selected {
-						ui.Icon(c, iconSVG("check.svg")).TextColor(p.Accent)
+	}
+	universalDir := ".agents/skills"
+	if a.InstallFlow.Global {
+		universalDir = "~/.agents/skills"
+	}
+	ui.Column(c).Radius(RadiusCard).Border(1, p.Border).Background(p.Surface).Clip().Children(func() {
+		head := a.targetRow(c, "install-target-universal", universal, func() {
+			ui.Text(c, a.T("通用", "Universal")).FontSize(14).Bold().Margin(0, 0, 0, 9)
+		}, universalDir)
+		head.OnClick(func() { a.toggleInstallTarget(model.TargetUniversal) })
+		const cols = 3
+		for i := 0; i < len(shared); i += cols {
+			ui.Row(c).Children(func() {
+				for j := i; j < i+cols; j++ {
+					cell := ui.Row(c).Height(48).Basis(0).Grow(1).Padding(0, 11).Gap(8).
+						AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.Border)
+					if j%cols < cols-1 {
+						cell.BorderWidth(1, 1, 0, 0)
 					}
-				})
-			if selected {
-				row.Background(p.Selected)
-			}
-			row.OnClick(func() {
-				a.Projects.OpenProject = path
+					if j >= len(shared) {
+						continue
+					}
+					info := shared[j]
+					cell.Children(func() {
+						brandTile(c, p, info.IconPath)
+						ui.Text(c, info.Name).FontSize(12).TextColor(p.Secondary).SingleLine()
+					})
+				}
 			})
 		}
 	})
+	ui.Box(c).Height(10).Shrink(0)
+	ui.Column(c).Radius(RadiusCard).Border(1, p.Border).Background(p.Surface).Clip().Children(func() {
+		ui.Row(c).Height(42).Padding(0, 13).AlignItems(ui.Center).Children(func() {
+			ui.Text(c, a.T("独立安装", "Agent-specific")).FontSize(14).Bold()
+		})
+		for _, info := range agents.IndependentInstallTargets {
+			info := info
+			var dir string
+			if a.InstallFlow.Global {
+				dir = displayPath(agents.GlobalTargetRoot(homeDir(), info.Target))
+			} else {
+				dir = agents.TargetDirectory(info.Target)
+			}
+			row := a.targetRow(c, "install-target-"+string(info.Target), a.InstallFlow.SelectedTargets[info.Target], func() {
+				ui.Box(c).Margin(0, 0, 0, 9).Children(func() { brandTile(c, p, info.IconPath) })
+				ui.Text(c, info.Name).FontSize(13).Margin(0, 0, 0, 9).SingleLine()
+			}, dir)
+			row.BorderWidth(1, 0, 0, 0).BorderColor(p.Border)
+			row.OnClick(func() { a.toggleInstallTarget(info.Target) })
+		}
+	})
 }
 
-// installTargetGrid is target_group: the 3-column AGENT_ICON_ORDER
-// grid filtered by supports_target(Universal).
-func (a *App) installTargetGrid(c *ui.Context) {
+// targetRow is a 48-point selectable row: a check box, the label built by
+// label, and the target directory right-aligned in mono.
+func (a *App) targetRow(c *ui.Context, key string, active bool, label func(), dir string) ui.Element {
 	p := a.Palette()
-	var flat []agents.AgentIconInfo
-	for _, info := range agents.AgentIconOrder {
-		if info.SupportsTarget(model.TargetUniversal) {
-			flat = append(flat, info)
-		}
+	row := ui.Row(c).Height(48).Padding(0, 13).AlignItems(ui.Center).
+		Cursor(ui.CursorPointer).Key(key)
+	if active {
+		row.Background(p.Selected)
 	}
-	const cols = 3
-	for i := 0; i < len(flat); i += cols {
-		end := i + cols
-		if end > len(flat) {
-			end = len(flat)
-		}
-		row := flat[i:end]
-		ui.Row(c).Gap(6).Margin(0, 0, 6, 0).Children(func() {
-			for _, info := range row {
-				info := info
-				target := info.InstallTargets[0]
-				selected := a.InstallFlow.SelectedTargets[target]
-				tile := ui.Column(c).Basis(0).Grow(1).Padding(8, 10).Gap(4).
-					Radius(10).Border(1, p.Border).Cursor(ui.CursorPointer).
-					Key("install-target-" + string(target)).
-					Children(func() {
-						ui.Row(c).AlignItems(ui.Center).Gap(6).Children(func() {
-							ui.Icon(c, iconSVG(info.IconPath)).TextColor(p.Text)
-							ui.Text(c, info.Name).FontSize(12).Bold().Shrink(0)
-						})
-						var dir string
-						if a.InstallFlow.Global {
-							dir = displayPath(agents.GlobalTargetRoot(homeDir(), target))
-						} else {
-							dir = agents.TargetDirectory(target)
-						}
-						ui.Text(c, dir).FontSize(10).Font(FontMono).TextColor(p.Muted).SingleLine()
-					})
-				if selected {
-					tile.BorderColor(p.Accent)
-				}
-				tile.OnClick(func() {
-					a.toggleInstallTarget(target)
-				})
-			}
+	return row.Children(func() {
+		checkMark(c, p, active)
+		label()
+		ui.Spacer(c).Grow(1)
+		ui.Text(c, dir).FontSize(12).Font(FontMono).TextColor(p.Muted).SingleLine().Shrink(1)
+	})
+}
+
+// checkMark draws a 16-point check box, filled with the accent when on.
+func checkMark(c *ui.Context, p Palette, on bool) {
+	box := ui.Box(c).Size(16, 16).Radius(4).Center().Shrink(0)
+	if on {
+		box.Background(p.Accent).Children(func() {
+			ui.Icon(c, iconSVG("check.svg")).Size(12, 12).TextColor(p.OnAccent)
 		})
+	} else {
+		box.Border(1, p.BorderStrong)
 	}
+}
+
+// brandTile is the 28-point rounded tile around an agent's brand icon.
+func brandTile(c *ui.Context, p Palette, iconPath string) {
+	tile := ui.Box(c).Size(28, 28).Radius(7).Center().Shrink(0)
+	if iconPath != "icons/provider-codex.svg" {
+		tile.Background(p.Raised)
+	}
+	tile.Children(func() { brandIcon(c, iconPath, 18).TextColor(p.Text) })
 }
 
 // joinLines joins failure messages with newlines.

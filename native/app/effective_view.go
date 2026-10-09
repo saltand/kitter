@@ -70,8 +70,6 @@ type EffectiveSkillRow struct {
 	DirectInstallations []model.ProjectSkillInstallation
 }
 
-
-
 // skillRows is effective_view::skill_rows.
 func skillRows(estimates []effective.AgentContextEstimate, projectSkills []model.ProjectSkill, selectedAgent *effective.AgentKind) []EffectiveSkillRow {
 	var entries []effective.GroupEntry

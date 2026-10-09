@@ -23,8 +23,8 @@ const (
 
 // TagEdit is ui::TagEdit.
 type TagEdit struct {
-	Kind   TagEditKind
-	ID     tags.TagID // Rename target, or parent for CreateChild
+	Kind TagEditKind
+	ID   tags.TagID // Rename target, or parent for CreateChild
 }
 
 // TagEditKind classifies TagEdit.
@@ -388,7 +388,6 @@ func joinComma(keys []string) string {
 	}
 	return out
 }
-
 
 // checkAllUpdates is check_all_updates: run source.CheckUpdates in a
 // background library instance; the count + errors come back through

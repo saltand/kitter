@@ -10,6 +10,22 @@ const (
 	FontMono = "JetBrains Mono"
 )
 
+// Control metrics from src/ui/theme.rs.
+const (
+	ControlHeight           = 28
+	DialogControlHeight     = 32
+	InputHeight             = 40
+	SearchHeight            = 32
+	RowHeight               = 30
+	RadiusControl           = 12.5
+	RadiusListRow           = 10
+	RadiusInlineInput       = 10
+	RadiusMenu              = 15
+	RadiusCard              = 20
+	SettingsContentMaxWidth = 768
+	RadiusModal             = 25
+)
+
 // Palette is src/ui/theme.rs::Palette.
 type Palette struct {
 	Window       ui.Color
@@ -101,4 +117,25 @@ func (a *App) Palette() Palette {
 		return PaletteDark()
 	}
 	return PaletteLight()
+}
+
+// dialog is ui.Modal without the theme panel's padding: the dim
+// backdrop and shadow stay, and fn's own column draws the whole panel
+// with RadiusModal corners, as the Rust dialogs do.
+func (a *App) dialog(c *ui.Context, open *bool, fn func()) {
+	p := a.Palette()
+	ui.DialogBase(c, open, func(backdrop, panel ui.Element) {
+		backdrop.Background(ui.RGBA(0, 0, 0, 0.4))
+		panel.Radius(RadiusModal).Background(p.Elevated).Clip().
+			Shadow(0, 10, 30, 0, ui.RGBA(0, 0, 0, 0.3))
+		fn()
+	})
+}
+
+// searchField is the Rust search input: a SearchHeight pill with a
+// strong border on the surface color.
+func (a *App) searchField(c *ui.Context, value *string) ui.Element {
+	p := a.Palette()
+	return ui.SearchField(c, value).FillWidth().Height(SearchHeight).Radius(SearchHeight/2).
+		Background(p.Surface).Border(1, p.BorderStrong).FontSize(14)
 }
