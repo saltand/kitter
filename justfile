@@ -1,79 +1,30 @@
 set shell := ["zsh", "-cu"]
 
 root := justfile_directory()
-release_dir := root + "/target/release"
-app_dir := release_dir + "/Kitter.app"
-icon_source := root + "/assets/macos/app-icon.png"
-dmg_background := root + "/assets/dmg/background.png"
-version := `sed -nE 's/^version = "([^"]+)"/\1/p' Cargo.toml | head -n 1`
-architecture := `uname -m`
-dmg := release_dir + "/Kitter-" + version + "-macos-" + architecture + ".dmg"
 
 default:
     @just --list
 
+# vet + race tests + mygo vet
 check:
-    cargo test --locked
+    cd native && go vet ./... && go test -race -count=3 ./... && go tool mygo vet .
 
-build:
-    cargo build --release --locked --features desktop --bin kitter-desktop --bin kitter
+# Standalone CLI → native/build/kitter
+cli:
+    cd native && go build -o build/kitter ./cmd/kitter
+
+# .app bundle + dmg (code signing, dmg and notarization require macOS)
+app:
+    cd native && go tool mygo build -platform darwin/arm64
+
+# Universal .app (both architectures; macOS only for signing/dmg)
+app-universal:
+    cd native && go tool mygo build -platform darwin/universal
+
+# Dev server
+run:
+    cd native && go tool mygo dev
 
 # Regenerate the committed macOS icon with Apple's standalone Icon Composer.
 macos-icon:
     "{{root}}/scripts/export-macos-icon.sh"
-
-app: build
-    rm -rf "{{app_dir}}"
-    rm -rf "{{release_dir}}/logo.iconset"
-    mkdir -p "{{app_dir}}/Contents/MacOS" "{{app_dir}}/Contents/Resources" "{{release_dir}}/logo.iconset"
-    sips -z 16 16 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_16x16.png"
-    sips -z 32 32 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_16x16@2x.png"
-    sips -z 32 32 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_32x32.png"
-    sips -z 64 64 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_32x32@2x.png"
-    sips -z 128 128 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_128x128.png"
-    sips -z 256 256 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_128x128@2x.png"
-    sips -z 256 256 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_256x256.png"
-    sips -z 512 512 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_256x256@2x.png"
-    sips -z 512 512 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_512x512.png"
-    sips -z 1024 1024 "{{icon_source}}" --out "{{release_dir}}/logo.iconset/icon_512x512@2x.png"
-    iconutil -c icns "{{release_dir}}/logo.iconset" -o "{{app_dir}}/Contents/Resources/logo.icns"
-    cp "{{release_dir}}/kitter-desktop" "{{app_dir}}/Contents/MacOS/Kitter"
-    cp "{{root}}/resources/Info.plist" "{{app_dir}}/Contents/Info.plist"
-    cp "{{root}}/LICENSE" "{{root}}/THIRD_PARTY_LICENSES.md" "{{app_dir}}/Contents/Resources/"
-    plutil -replace CFBundleShortVersionString -string "{{version}}" "{{app_dir}}/Contents/Info.plist"
-    plutil -replace CFBundleVersion -string "{{version}}" "{{app_dir}}/Contents/Info.plist"
-    chmod +x "{{app_dir}}/Contents/MacOS/Kitter"
-    xattr -cr "{{app_dir}}"
-    codesign --deep --force --sign - "{{app_dir}}"
-    codesign --verify --deep --strict "{{app_dir}}"
-    @echo "App ready: {{app_dir}}"
-
-package: app
-    "{{root}}/scripts/package-macos-dmg.sh" "{{app_dir}}" "{{dmg_background}}" "{{dmg}}"
-    @file "{{release_dir}}/kitter" "{{release_dir}}/kitter-desktop"
-    @shasum -a 256 "{{dmg}}"
-    @echo "Package ready: {{dmg}}"
-
-run: app
-    open "{{app_dir}}"
-
-release: check package
-    @echo "Release ready: {{dmg}}"
-
-# --- Go/MyGo port (native/) ------------------------------------------------
-
-# vet + race tests + mygo vet
-go-check:
-    cd native && go vet ./... && go test -race -count=3 ./... && go tool mygo vet .
-
-# Standalone CLI
-go-cli:
-    cd native && go build -o build/kitter ./cmd/kitter
-
-# .app bundle + dmg (code signing/dmg/notarize require macOS)
-go-app:
-    cd native && go tool mygo build -platform darwin/arm64
-
-# Dev server
-go-run:
-    cd native && go tool mygo dev

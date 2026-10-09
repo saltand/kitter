@@ -1,5 +1,8 @@
-/target
 /.DS_Store
 /.agents
 .DS_Store
 *.log
+# Go / mygo build outputs
+/native/build/
+/native/dist/
+native/kitter

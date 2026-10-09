@@ -17,157 +17,64 @@ jobs:
         include:
           - arch: arm64
             os: macos-latest
+            goarch: arm64
           - arch: x86_64
             os: macos-15-intel
+            goarch: amd64
     runs-on: ${{ matrix.os }}
     env:
       KITTER_ARCH: ${{ matrix.arch }}
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.1"
       - name: Install just
         run: brew install just
-      - name: Verify tag matches Cargo version
+      - name: Verify tag matches app version
         shell: bash
         run: |
-          crate_version="$(sed -nE 's/^version = "([^"]+)"/\1/p' Cargo.toml | head -n 1)"
-          test "$GITHUB_REF_NAME" = "v${crate_version}"
+          app_version="$(sed -nE 's/.*"version": *"([^"]+)".*/\1/p' native/mygo.json | head -n 1)"
+          test "$GITHUB_REF_NAME" = "v${app_version}"
       - name: Verify runner architecture
         run: test "$(uname -m)" = "$KITTER_ARCH"
-      - name: Build and verify desktop package
-        run: just release
-      - name: Verify binary architectures
+      - name: Build desktop .app + dmg
+        working-directory: native
         run: |
-          lipo target/release/Kitter.app/Contents/MacOS/Kitter -verify_arch "$KITTER_ARCH"
-          lipo target/release/kitter -verify_arch "$KITTER_ARCH"
-          target/release/kitter --help
+          go tool mygo build -platform "darwin/${{ matrix.goarch }}" -sign - -skip-notarize
+      - name: Build standalone CLI
+        working-directory: native
+        run: |
+          GOOS=darwin GOARCH=${{ matrix.goarch }} go build -o build/kitter ./cmd/kitter
+          ./build/kitter --help >/dev/null
+      - name: Rename dmg to the release artifact name
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          dmg="$(find native/build -name 'Kitter*.dmg' | head -n 1)"
+          mv "$dmg" "native/build/Kitter-${version}-desktop-macos-${KITTER_ARCH}.dmg"
       - name: Package standalone CLI
         shell: bash
         run: |
-          crate_version="${GITHUB_REF_NAME#v}"
-          package_dir="target/release/kitter-cli-macos-${KITTER_ARCH}"
-          archive="target/release/Kitter-${crate_version}-cli-macos-${KITTER_ARCH}.tar.gz"
+          version="${GITHUB_REF_NAME#v}"
+          package_dir="native/build/kitter-cli-macos-${KITTER_ARCH}"
+          archive="native/build/Kitter-${version}-cli-macos-${KITTER_ARCH}.tar.gz"
           mkdir -p "$package_dir"
-          cp target/release/kitter LICENSE THIRD_PARTY_LICENSES.md "$package_dir/"
+          cp native/build/kitter LICENSE THIRD_PARTY_LICENSES.md "$package_dir/"
           tar -czf "$archive" -C "$package_dir" .
           tar -tzf "$archive"
       - uses: actions/upload-artifact@v4
         with:
           name: release-macos-${{ matrix.arch }}
           path: |
-            target/release/Kitter-*-macos-${{ matrix.arch }}.dmg
-            target/release/Kitter-*-cli-macos-${{ matrix.arch }}.tar.gz
-          if-no-files-found: error
-
-  linux-x86-64:
-    name: Linux x86_64
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install desktop build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libfontconfig-dev \
-            libwayland-dev \
-            libx11-xcb-dev \
-            libxkbcommon-x11-dev \
-            libvulkan-dev
-      - name: Verify tag matches Cargo version
-        shell: bash
-        run: |
-          crate_version="$(sed -nE 's/^version = "([^"]+)"/\1/p' Cargo.toml | head -n 1)"
-          test "$GITHUB_REF_NAME" = "v${crate_version}"
-      - name: Build desktop app and standalone CLI
-        run: cargo build --release --locked --features desktop --bin kitter-desktop --bin kitter
-      - name: Package desktop app
-        shell: bash
-        run: |
-          crate_version="${GITHUB_REF_NAME#v}"
-          package_dir="target/release/kitter-desktop-linux-x86_64/Kitter"
-          archive="target/release/Kitter-${crate_version}-desktop-linux-x86_64.tar.gz"
-          mkdir -p "$package_dir"
-          cp target/release/kitter-desktop "$package_dir/Kitter"
-          cp assets/app-icon.png "$package_dir/Kitter.png"
-          cp README.md README.zh-CN.md LICENSE THIRD_PARTY_LICENSES.md "$package_dir/"
-          chmod +x "$package_dir/Kitter"
-          tar -czf "$archive" -C "$(dirname "$package_dir")" Kitter
-          tar -tzf "$archive"
-      - name: Package standalone CLI
-        shell: bash
-        run: |
-          crate_version="${GITHUB_REF_NAME#v}"
-          package_dir="target/release/kitter-cli-linux-x86_64"
-          archive="target/release/Kitter-${crate_version}-cli-linux-x86_64.tar.gz"
-          mkdir -p "$package_dir"
-          cp target/release/kitter LICENSE THIRD_PARTY_LICENSES.md "$package_dir/"
-          tar -czf "$archive" -C "$package_dir" .
-          tar -tzf "$archive"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-linux-x86-64
-          path: |
-            target/release/Kitter-*-desktop-linux-x86_64.tar.gz
-            target/release/Kitter-*-cli-linux-x86_64.tar.gz
-          if-no-files-found: error
-
-  windows-x86-64:
-    name: Windows x86_64
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Verify tag matches Cargo version
-        shell: pwsh
-        run: |
-          $manifest = Get-Content Cargo.toml -Raw
-          $crateVersion = [regex]::Match($manifest, '(?m)^version = "([^"]+)"').Groups[1].Value
-          if ($env:GITHUB_REF_NAME -ne "v$crateVersion") {
-            throw "Tag $env:GITHUB_REF_NAME does not match Cargo version $crateVersion"
-          }
-      - name: Build desktop app and standalone CLI
-        run: cargo build --release --locked --features desktop --bin kitter-desktop --bin kitter
-      - name: Package desktop app
-        shell: pwsh
-        run: |
-          $crateVersion = ($env:GITHUB_REF_NAME).TrimStart('v')
-          $desktopExe = "target/release/Kitter-$crateVersion-desktop-windows-x86_64.exe"
-          Copy-Item target/release/kitter-desktop.exe $desktopExe
-          if (-not (Test-Path $desktopExe)) {
-            throw "Desktop executable was not created"
-          }
-          $versionInfo = (Get-Item $desktopExe).VersionInfo
-          if ($versionInfo.ProductName -ne "Kitter" -or $versionInfo.FileDescription -ne "Kitter") {
-            throw "Desktop executable is missing Windows application resources"
-          }
-      - name: Package standalone CLI
-        shell: pwsh
-        run: |
-          $crateVersion = ($env:GITHUB_REF_NAME).TrimStart('v')
-          $packageDir = "target/release/kitter-cli-windows-x86_64"
-          $archive = "target/release/Kitter-$crateVersion-cli-windows-x86_64.zip"
-          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
-          Copy-Item target/release/kitter.exe, LICENSE, THIRD_PARTY_LICENSES.md -Destination $packageDir
-          Compress-Archive -Path "$packageDir/*" -DestinationPath $archive -Force
-          if (-not (Test-Path $archive)) {
-            throw "CLI archive was not created"
-          }
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-windows-x86-64
-          path: |
-            target/release/Kitter-*-desktop-windows-x86_64.exe
-            target/release/Kitter-*-cli-windows-x86_64.zip
+            native/build/Kitter-*-desktop-macos-${{ matrix.arch }}.dmg
+            native/build/Kitter-*-cli-macos-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
   publish:
     name: Publish GitHub Release
-    needs: [macos, linux-x86-64, windows-x86-64]
+    needs: [macos]
     runs-on: ubuntu-latest
 
     steps:
@@ -181,7 +88,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 8
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 4
           gh release create "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \

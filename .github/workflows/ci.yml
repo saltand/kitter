@@ -3,41 +3,27 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, feat/mygo-native-macos]
 
 jobs:
-  core:
-    name: Core (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-15-intel]
-    runs-on: ${{ matrix.os }}
+  native:
+    name: Go + MyGo
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux desktop build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libfontconfig-dev \
-            libwayland-dev \
-            libx11-xcb-dev \
-            libxkbcommon-x11-dev \
-            libvulkan-dev
-      - name: Verify Apache tracing shim
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          dependency_tree="$(cargo tree --locked --features desktop --edges normal,build --prefix none)"
-          printf '%s\n' "$dependency_tree" | grep -F 'crates/ztracing-shim'
-          if printf '%s\n' "$dependency_tree" | grep -Eq '^(zlog|ztracing_macro) v|^ztracing .*github.com/zed'; then
-            echo 'GPL tracing dependencies must remain replaced by the local Apache-2.0 shim.' >&2
-            exit 1
-          fi
-      - name: Test core and directory-link behavior
-        run: cargo test --locked
-      - name: Check desktop app
-        run: cargo check --locked --features desktop --bin kitter-desktop
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.1"
+      - name: Vet
+        working-directory: native
+        run: go vet ./...
+      - name: Test
+        working-directory: native
+        run: go test -race -count=1 ./...
+      - name: macOS cross-build
+        working-directory: native
+        run: GOOS=darwin GOARCH=arm64 go build ./...
+      - name: mygo vet
+        working-directory: native
+        run: go tool mygo vet .
