@@ -1,13 +1,13 @@
 # Third-Party Licenses
 
-Kitter includes third-party fonts and icon artwork. Product names and brand marks remain the property of their respective owners and are used only to identify compatible tools.
+Kitter is written in Go and embeds third-party fonts and icon artwork. Product names and brand marks remain the property of their respective owners and are used only to identify compatible tools.
 
 ## JetBrains Mono
 
 Files:
 
-- `assets/fonts/JetBrainsMono-Regular.ttf`
-- `assets/fonts/JetBrainsMono-Bold.ttf`
+- `native/app/fonts/JetBrainsMono-Regular.ttf`
+- `native/app/fonts/JetBrainsMono-Bold.ttf`
 
 Source: https://github.com/JetBrains/JetBrainsMono
 
@@ -108,9 +108,46 @@ DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
+
+## Go dependencies
+
+Kitter links these modules (see `native/go.sum` for exact versions).
+
+### MyGo
+
+Source: https://github.com/egoist/mygo
+
+License: MIT
+
+### purego
+
+Source: https://github.com/ebitengine/purego
+
+License: Apache-2.0
+
+### go-text/typesetting (+ typesetting-utils)
+
+Source: https://github.com/go-text/typesetting
+
+License: BSD-3-Clause
+
+### golang.org/x/image
+
+Source: https://github.com/golang/image (golang.org/x/image)
+
+License: BSD-3-Clause
+
+### gopkg.in/yaml.v3
+
+Source: https://github.com/go-yaml/yaml
+
+License: MIT + Apache-2.0 (yaml.v3 carries the Apache-2.0 port notice; the project is distributed under MIT)
+
+Full texts live in each module's LICENSE file inside the Go module cache and are reproduced at the sources above.
+
 ## Lobe Icons
 
-Confirmed source files include the provider icons for Amp, Antigravity, Claude Code, Codex, GitHub Copilot, Cursor, Gemini, OpenClaw, OpenCode, Pi, and Trae under `assets/icons/`.
+Confirmed source files include the provider icons for Amp, Antigravity, Claude Code, Codex, GitHub Copilot, Cursor, Gemini, OpenClaw, OpenCode, Pi, and Trae under `native/app/icons/`.
 
 Source: https://github.com/lobehub/lobe-icons
 
@@ -144,8 +181,8 @@ SOFTWARE.
 
 Confirmed source files:
 
-- `assets/icons/crown.svg`
-- `assets/icons/house.svg`
+- `native/app/icons/crown.svg`
+- `native/app/icons/house.svg`
 
 Several other interface icons are local variants. This notice is retained for any portions derived from Lucide or its Feather predecessors.
 

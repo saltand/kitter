@@ -8,15 +8,15 @@
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-3f8997" alt="Apache-2.0 许可证"></a>
-  <img src="https://img.shields.io/badge/desktop-macOS%20%7C%20Windows%20%7C%20Linux-15191a" alt="macOS、Windows 和 Linux 桌面应用">
-  <img src="https://img.shields.io/badge/built_with-Rust-b8aaa0" alt="使用 Rust 构建">
+  <img src="https://img.shields.io/badge/desktop-macOS-15191a" alt="macOS 桌面应用">
+  <img src="https://img.shields.io/badge/built_with-Go-00ADD8" alt="Built with Go">
 </p>
 
 <p align="center"><strong>一套 Skill 仓库，让每个项目只获得自己需要的 Skill。</strong></p>
 
 Kitter 是一个管理 Agent Skill 的桌面应用和 CLI。将 Skill 集中在一套仓库中，为每个项目选择合适的组合，在一处统一更新。
 
-Kitter 完全使用 Rust 和 GPUI 构建，界面简洁直观，体积小、资源占用低，操作流畅。
+Kitter 使用 Go 和 MyGo 构建，界面简洁、体积小巧、性能流畅。
 
 <p align="center">
   <img src="./assets/readme/skill-workflow.png" width="100%" alt="Kitter 统一维护 Skill 仓库，按需链接到项目和用户全局">
@@ -35,8 +35,7 @@ Kitter 完全使用 Rust 和 GPUI 构建，界面简洁直观，体积小、资�
 从 [GitHub Releases](https://github.com/what1f/kitter/releases/latest) 下载适合你系统的桌面应用。
 
 - **macOS（Apple Silicon / Intel）**——Apple Silicon 选择 `macos-arm64.dmg`，Intel 选择 `macos-x86_64.dmg`，打开后将 `Kitter.app` 拖入 `Applications`。
-- **Windows（x64）**——下载 `Kitter-<version>-desktop-windows-x86_64.exe`，直接运行。
-- **Linux（x64）**——解压 `Kitter-<version>-desktop-linux-x86_64.tar.gz`，进入解压后的 `Kitter` 目录，运行 `./Kitter`。
+
 
 Kitter 暂时没有 Apple Developer ID 签名。如果首次启动被 macOS 阻止，请确认应用来自官方 Release，再前往 **系统设置 → 隐私与安全 → 仍要打开**，按提示确认。详见 [Apple 官方指引](https://support.apple.com/zh-cn/102445)。
 
@@ -46,7 +45,7 @@ Kitter 暂时没有 Apple Developer ID 签名。如果首次启动被 macOS 阻�
 xattr -dr com.apple.quarantine /Applications/Kitter.app
 ```
 
-桌面应用和 CLI 共用同一套核心，但作为两个独立产物发布。GitHub Release 提供 macOS、Windows 和 Linux 的独立 CLI 包；内置 Kitter Skill 会查找这个独立 CLI，并在缺失时引导你下载。
+桌面应用和 CLI 共用同一套核心，但作为两个独立产物发布。GitHub Release 提供 macOS 独立 CLI 包；内置 Kitter Skill 会查找这个独立 CLI，并在缺失时引导你下载。
 
 ## 使用 Kitter 管理 Skill
 
@@ -95,7 +94,7 @@ kitter update skill-a
 
 ## 独立 CLI 与 Agent Skill
 
-使用 Kitter 不要求安装桌面应用。你可以从 [GitHub Releases](https://github.com/what1f/kitter/releases/latest) 下载独立 CLI，将 `kitter` 放入 `PATH`，然后直接安装 [`$kitter` Skill](./resources/skills/kitter)：
+使用 Kitter 不要求安装桌面应用。你可以从 [GitHub Releases](https://github.com/what1f/kitter/releases/latest) 下载独立 CLI，将 `kitter` 放入 `PATH`，然后直接安装 [`$kitter` Skill](./native/core/library/builtin/kitter)：
 
 ```bash
 npx skills add what1f/kitter --skill kitter
@@ -109,7 +108,9 @@ npx skills add what1f/kitter --skill kitter
 ```bash
 git clone https://github.com/what1f/kitter.git
 cd kitter
-cargo run --release --locked --features desktop --bin kitter-desktop
+just run        # go tool mygo dev
+just cli        # 独立 CLI → native/build/kitter
+just app        # .app bundle + dmg（macOS）
 ```
 
 </details>
@@ -117,8 +118,7 @@ cargo run --release --locked --features desktop --bin kitter-desktop
 ## 平台状态
 
 - **macOS（Apple Silicon / Intel）**——提供桌面应用和独立 CLI。
-- **Windows（x64）**——提供桌面应用和独立 CLI，已在 Windows 上测试，并针对启动和性能问题完成适配修复。
-- **Linux（x64）**——提供独立 CLI 和桌面构建，桌面应用仍需在真实系统中验证。
+
 
 ## 本地数据
 
@@ -127,8 +127,6 @@ Kitter 将配置和来源记录保存在操作系统的应用数据目录，Skil
 | 平台 | 默认 Skill 仓库 |
 | --- | --- |
 | macOS | `~/Library/Application Support/Kitter/skills` |
-| Windows | `%LOCALAPPDATA%\Kitter\skills` |
-| Linux | `$XDG_DATA_HOME/Kitter/skills` 或 `~/.local/share/Kitter/skills` |
 
 使用 `kitter library` 和 `kitter library --set /absolute/path` 查看或修改位置。
 

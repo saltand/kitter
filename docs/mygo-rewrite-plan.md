@@ -270,3 +270,7 @@ M1 之后 M2/M3/M4 的核心与 UI 可以交替推进；`effective`（M4）体�
 - Finder/Spotlight 启动时的 PATH：`source.FindTool` 的 fallback（Homebrew、`~/.local/bin`、nvm 版本目录）在 GUI 启动（无 shell PATH）下能找到 `npx`/`git`/`claude`。
 - CLI：`go-cli` 产出的 `kitter` 与 `kitter --help`，`list --json` 与 Rust 版输出逐字段对比；`references/install-cli.md` 里的安装路径（`~/.local/bin/kitter`）。
 - 性能：长技能列表滚动流畅度、冷启动时间与内存（与 GPUI 版对比）。
+
+### Rust 代码清理（本分支）
+
+`src/`、`crates/`、`Cargo.toml`、`Cargo.lock`、`build.rs`、Rust 打包脚本（`dmg-settings.py`、`package-macos-dmg.sh`）、`resources/Info.plist` 与 `resources/skills/` 已从本分支移除；内置 skill 的唯一源在 `native/core/library/builtin/kitter/`（`builtin_test.go` 校验 embed 完整性），图标/字体源在 `native/app/`（icons、fonts）与 `assets/macos/`（macOS 图标工程）。Rust 版本完整保留在 `feat/manual-only` 和 `main`：需要对比行为时用 `git worktree add ../kitter-rust feat/manual-only` 检出并构建。

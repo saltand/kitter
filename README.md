@@ -8,15 +8,15 @@
 
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-3f8997" alt="Apache-2.0 license"></a>
-  <img src="https://img.shields.io/badge/desktop-macOS%20%7C%20Windows%20%7C%20Linux-15191a" alt="macOS, Windows, and Linux desktop app">
-  <img src="https://img.shields.io/badge/built_with-Rust-b8aaa0" alt="Built with Rust">
+  <img src="https://img.shields.io/badge/desktop-macOS-15191a" alt="macOS desktop app">
+  <img src="https://img.shields.io/badge/built_with-Go-00ADD8" alt="Built with Go">
 </p>
 
 <p align="center"><strong>One skill library. Every project gets only what it needs.</strong></p>
 
 Kitter is a desktop app and CLI for managing Agent Skills across projects. Keep your skills in one library, install the right combination for each project, and update them in one place.
 
-Built entirely in Rust with GPUI, Kitter pairs a straightforward interface with a small footprint and smooth native performance.
+Built in Go with MyGo, Kitter pairs a straightforward interface with a small footprint and smooth native performance.
 
 <p align="center">
   <img src="./assets/readme/skill-workflow.png" width="100%" alt="Kitter maintains one skill library and links selected skills to projects and user-level installations">
@@ -35,8 +35,6 @@ Working across projects often means maintaining several copies of the same skill
 Download the app for your platform from [GitHub Releases](https://github.com/what1f/kitter/releases/latest).
 
 - **macOS (Apple Silicon / Intel)** — choose the `macos-arm64.dmg` (Apple Silicon) or `macos-x86_64.dmg` (Intel) download, open the `.dmg` and drag `Kitter.app` into `Applications`.
-- **Windows (x64)** — download `Kitter-<version>-desktop-windows-x86_64.exe` and run it directly.
-- **Linux (x64)** — extract `Kitter-<version>-desktop-linux-x86_64.tar.gz` and run `./Kitter` from the extracted `Kitter` directory.
 
 Kitter is not yet signed with an Apple Developer ID. If macOS blocks the first launch, confirm that you downloaded it from the official release, then go to **System Settings → Privacy & Security → Open Anyway** and follow the prompts. See [Apple’s instructions](https://support.apple.com/102445).
 
@@ -46,7 +44,7 @@ You can also run the following command, then open Kitter again:
 xattr -dr com.apple.quarantine /Applications/Kitter.app
 ```
 
-The desktop app and CLI are separate release artifacts built on the same core. Standalone CLI packages for macOS, Windows, and Linux are available from [GitHub Releases](https://github.com/what1f/kitter/releases/latest). The built-in Kitter skill resolves that standalone CLI and guides you through downloading it when needed.
+The desktop app and CLI are separate release artifacts built on the same core. Standalone CLI packages for macOS are available from [GitHub Releases](https://github.com/what1f/kitter/releases/latest). The built-in Kitter skill resolves that standalone CLI and guides you through downloading it when needed.
 
 ## Manage your skills with Kitter
 
@@ -95,7 +93,7 @@ kitter update skill-a
 
 ## Standalone CLI and agent skill
 
-You do not need the desktop app to use Kitter. Download the standalone CLI from [GitHub Releases](https://github.com/what1f/kitter/releases/latest), put `kitter` on your `PATH`, and install the [`$kitter` skill](./resources/skills/kitter) directly:
+You do not need the desktop app to use Kitter. Download the standalone CLI from [GitHub Releases](https://github.com/what1f/kitter/releases/latest), put `kitter` on your `PATH`, and install the [`$kitter` skill](./native/core/library/builtin/kitter) directly:
 
 ```bash
 npx skills add what1f/kitter --skill kitter
@@ -109,7 +107,9 @@ The skill lets an agent inspect the current machine, add or adopt skill sources,
 ```bash
 git clone https://github.com/what1f/kitter.git
 cd kitter
-cargo run --release --locked --features desktop --bin kitter-desktop
+just run        # go tool mygo dev
+just cli        # standalone CLI → native/build/kitter
+just app        # .app bundle + dmg (macOS)
 ```
 
 </details>
@@ -117,8 +117,6 @@ cargo run --release --locked --features desktop --bin kitter-desktop
 ## Platform status
 
 - **macOS (Apple Silicon / Intel)** — desktop application and standalone CLI.
-- **Windows (x64)** — desktop application and standalone CLI, tested on Windows with platform-specific startup and performance fixes.
-- **Linux (x64)** — standalone CLI and desktop build available; the desktop app still needs validation on real systems.
 
 ## Local data
 
@@ -127,8 +125,6 @@ Kitter stores configuration and source records in the operating system's applica
 | Platform | Default skill library |
 | --- | --- |
 | macOS | `~/Library/Application Support/Kitter/skills` |
-| Windows | `%LOCALAPPDATA%\Kitter\skills` |
-| Linux | `$XDG_DATA_HOME/Kitter/skills` or `~/.local/share/Kitter/skills` |
 
 View or change the location with `kitter library` and `kitter library --set /absolute/path`.
 
