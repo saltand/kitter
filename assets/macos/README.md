@@ -1,7 +1,7 @@
 # macOS app icon
 
 `Kitter.icon` is the editable Icon Composer source. Its artwork preserves the
-existing Kitter illustration from `../app-icon.png`.
+existing Kitter illustration (the full-bleed cross-platform artwork).
 
 `app-icon.png` is the committed 1024×1024 RGBA packaging asset. Icon Composer
 renders the macOS rounded mask and material; the export script scales that result
@@ -16,8 +16,9 @@ just macos-icon
 
 Set `ICON_COMPOSER_TOOL` if `ictool` is installed elsewhere. The release build
 uses the committed PNG, so CI and contributors do not need Icon Composer.
-`just app` generates all ten standard ICNS representations and embeds
-`logo.icns` via `CFBundleIconFile` before signing the bundle.
+`native/mygo.json` points `icon` at this file; `go tool mygo build` resizes it
+into `AppIcon.icns` (referenced via `CFBundleIconFile`). MyGo only resizes — it
+adds no padding or mask — so the inset must already be baked into this PNG.
 
 This uses the static ICNS path with the app's macOS 12 deployment target.
 The icon was verified in the installer, Launchpad, and Dock on macOS 15.6.1;

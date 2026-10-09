@@ -55,7 +55,7 @@ native/
 ├── go.mod                  # module github.com/saltand/kitter/native，go 1.27.1，依赖 mygo（锁定到具体版本）
 ├── mygo.json               # name: Kitter, identifier, version, icon
 ├── resources/
-│   ├── icon.png            # 由 assets/macos/app-icon.png 复制
+│   (icon 直接引用 ../assets/macos/app-icon.png，不复制)
 │   └── skills/kitter/…     # 内置技能（也可 go:embed）
 ├── main.go                 # 桌面入口：PATH 修复、App.Run、菜单、窗口
 ├── cmd/kitter/main.go      # CLI 入口
